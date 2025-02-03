@@ -4,7 +4,8 @@ from typing import List
 import pymssql
 
 from adaptor import Adaptor
-from database_objects import Database, Table, KeyType, FieldType, Key, Field, DataException, DatatypeException
+from database_objects import Database, Table, KeyType, FieldType, Key, Field, DataException, DatatypeException, View, \
+    UDDT, UDTT
 
 
 class MsSqlAdaptor(Adaptor):
@@ -30,84 +31,111 @@ class MsSqlAdaptor(Adaptor):
         if db_name is None:
             db_name = self.database
 
-        database = Database(self.naming.string_to_name(db_name))
-        cursor = connection.cursor(buffered=True)
+        database = Database(db_name)
+        cursor = connection.cursor(as_dict=True)
         print("Processing tables...")
         cursor.execute(
             "select schema_name(tab.schema_id) as schema_name, tab.name as table_name, col.column_id as id, col.name, "
             "t.name as data_type, col.max_length, col.precision, col.is_nullable, "
-            "COLUMNPROPERTY(object_id(schema_name(tab.schema_id)+'.'+tab.name), col.name, 'IsIdentity') as IS_IDENTITY "
+            "COLUMNPROPERTY(object_id(schema_name(tab.schema_id)+'.'+tab.name), col.name, 'IsIdentity') as IS_IDENTITY, d.definition as default_value"
             "from sys.tables as tab "
             "inner join sys.columns as col on tab.object_id = col.object_id "
             "left join sys.types as t on col.user_type_id = t.user_type_id "
+            "left join sys.default_constraints d on d.object_id = col.default_object_id "
             "order by tab.name, column_id;")
         table_name = "none"
         table = None
         for row in cursor.fetchall():
-            new_table_name = f"{row[0]}.{row[1]}"
+            new_table_name = f"{row["schema_name"]}.{row["table_name"]}"
             if table_name != new_table_name:
+                print(new_table_name)
                 table_name = new_table_name
-                table = Table(self.naming.string_to_name(row[1]), self.naming.string_to_name(row[0]))
+                table = Table(row["table_name"], row["schema_name"])
                 database.tables.append(table)
 
-            field = Field(self.naming.string_to_name(str(row[1])),
-                          auto_increment=row[8] == 1,
-                          required=row[7] == 1)
-            self.get_field_type_defaults(row[4].decode("utf-8"), field, row[5], row[6],
-                                         row[5], row[9])
+            field = Field(str(row["name"]),
+                          auto_increment=row["IS_IDENTITY"] == 1,
+                          required=row["is_nullable"])
+            self.get_field_type_defaults(row["data_type"], field, row["max_length"], row["precision"],
+                                         row["precision"], row["default_value"])
 
-            print("Processing indexes and keys")
+            table.fields.append(field)
 
-            cursor.execute("select schema_name(t.schema_id) + '.' + t.[name] as table_view, "
-                           "case when t.[type] = 'U' then 'Table' "
-                           "when t.[type] = 'V' then 'View' "
-                           "end as [object_type], "
-                           "case when c.[type] = 'PK' then 'Primary key' "
-                           "when c.[type] = 'UQ' then 'Unique constraint' "
-                           "when i.[type] = 1 then 'Unique clustered index' "
-                           "when i.type = 2 then 'Unique index' "
-                           "end as constraint_type, "
-                           "c.[name] as constraint_name, "
-                           "substring(column_names, 1, len(column_names)-1) as [columns], "
-                           "i.[name] as index_name, "
-                           "case when i.[type] = 1 then 'Clustered index' "
-                           "when i.type = 2 then 'Index' "
-                           "end as index_type "
-                           "from sys.objects t "
-                           "left outer join sys.indexes i "
-                           "on t.object_id = i.object_id "
-                           "left outer join sys.key_constraints c "
-                           "on i.object_id = c.parent_object_id "
-                           "and i.index_id = c.unique_index_id "
-                           "cross apply (select col.[name] + ', ' "
-                           "from sys.index_columns ic "
-                           "inner join sys.columns col "
-                           "on ic.object_id = col.object_id "
-                           "and ic.column_id = col.column_id "
-                           "where ic.object_id = t.object_id "
-                           "and ic.index_id = i.index_id "
-                           "order by col.column_id "
-                           "for xml path ('') ) D (column_names) "
-                           "where is_unique = 1 "
-                           "and t.is_ms_shipped <> 1 "
-                           "order by schema_name(t.schema_id) + '.' + t.[name] ")
+        print("Processing views...")
+        cursor.execute("select schema_name(v.schema_id) as schema_name, v.name as view_name, c.name, c.column_id, "
+                       "t.name as data_type, c.max_length, c.precision, c.is_nullable, m.definition "
+                       "from sys.views v "
+                       "inner join sys.sql_modules m on m.object_id = v.object_id "
+                       "inner join sys.columns c on c.object_id = v.object_id "
+                       "left join sys.types as t on c.user_type_id = t.user_type_id "
+                       "order by schema_name, view_name, c.column_id")
+        view_name = "none"
+        view = None
+        for row in cursor.fetchall():
+            new_view_name = f"{row["schema_name"]}.{row["view_name"]}"
+            if view_name != new_view_name:
+                print(new_view_name)
+                view_name = new_view_name
+                view = View(row["view_name"], row["schema_name"])
+                view.definition = row["definition"]
+                database.tables.append(view)
 
-            for row in cursor.fetchall():
-                key = Key(self.naming.string_to_name(row[3]))
-                key.referenced_table = table.name.raw()
-                key_type = row[2].lower()
-                key.key_type = KeyType.get_keytype(key_type)
+            field = Field(str(row["name"]),
+                          required=row["is_nullable"])
+            self.get_field_type_defaults(row["data_type"], field, row["max_length"], row["precision"],
+                                         row["precision"], None)
 
-                key.fields = [f.strip() for f in row[4].split(",")]
+            view.fields.append(field)
 
-                if key.key_type == KeyType.ForeignKey:
-                    key.primary_table = row[1]
-                    key.primary_fields = [f.strip() for f in row[3].split(",")]
+        print("Processing uddts...")
+        cursor.execute(
+            "select schema_name(t.schema_id) as schema_name, t.name, tp.name as base_type, t.max_length, "
+            "t.precision, t.scale, t.is_nullable "
+            "from sys.types t "
+            "inner join sys.types tp on tp.system_type_id = t.system_type_id "
+            "where t.is_user_defined = 1 and t.is_table_type = 0")
 
-                if key.key_type == KeyType.PrimaryKey:
-                    table.pk = key
-                else:
-                    table.keys.append(key)
+        uddt_name = "none"
+        uddt = None
+        for row in cursor.fetchall():
+            new_uddt_name = f"{row["schema_name"]}.{row["name"]}"
+            if uddt_name != new_uddt_name:
+                print(new_uddt_name)
+                udt_name = new_uddt_name
+                udt = UDDT(row["name"], row["schema_name"], required=row["is_nullable"] == 0)
+                self.get_field_type_defaults(row["base_type"], udt, row["max_length"], row["precision"],
+                                             row["scale"], None)
+                database.uddts.append(uddt)
+
+        print("Processing udtts...")
+        cursor.execute(
+            "SELECT SCHEMA_NAME(TYPE.schema_id) as schema_name, TYPE.name AS \"Type Name\", COL.column_id, "
+            "COL.name AS \"Column\", ST.name AS \"Data Type\", "
+            "CASE COL.Is_Nullable "
+            "WHEN 1 THEN 1 "
+            "ELSE 0 "
+            "END AS \"Nullable\", COL.max_length AS \"Length\", COL.[precision] AS \"Precision\", COL.scale AS \"Scale\" "
+            "FROM sys.table_types TYPE "
+            "JOIN sys.columns COL ON TYPE.type_table_object_id = COL.object_id "
+            "JOIN sys.systypes AS ST ON ST.xtype = COL.system_type_id "
+            "where TYPE.is_user_defined = 1 "
+            "ORDER BY schema_name, \"Type Name\", COL.column_id")
+
+        udtt_name = "none"
+        udtt = None
+        for row in cursor.fetchall():
+            new_udtt_name = f"{row["schema_name"]}.{row["view_name"]}"
+            if udtt_name != new_udtt_name:
+                print(new_udtt_name)
+                udtt_name = new_udtt_name
+                udtt = UDTT(row["view_name"], row["schema_name"])
+                database.udtts.append(udtt)
+
+            field = Field(row["Column"], required=row["Nullable"] == 0)
+            self.get_field_type_defaults(row["Data Type"], field, row["Length"], row["Precision"],
+                                         row["Scale"], None)
+
+            udtt.fields.append(field)
 
         connection.close()
         return database
@@ -202,9 +230,9 @@ class MsSqlAdaptor(Adaptor):
         return result
 
     @staticmethod
-    def get_field_type_defaults(value: str, field: Field, size, precision, scale, default):
+    def get_field_type_defaults(value: str, field, size, precision, scale, default):
         value = value.lower()
-        default = None if default is None else default.decode("utf-8")
+        default = None if default is None else str(default)
         if value == "integer" or value == "int":
             field.type = FieldType.Integer
             field.size = 4
@@ -226,22 +254,28 @@ class MsSqlAdaptor(Adaptor):
         elif value == "double":
             field.type = FieldType.Float
             field.size = 8
-        elif value == "boolean" or value == "bool":
+        elif value == "boolean" or value == "bool" or value == "bit":
             field.type = FieldType.Boolean
             field.size = 1
-        elif value == "decimal" or value == "money":
+        elif value == "decimal" or value == "money" or value == "numeric":
             field.type = FieldType.Decimal
             field.size = precision
             field.scale = scale
-        elif value == "string" or value == "varchar" or value == "char":
+        elif value == "string" or value == "varchar" or value == "char" or value == "nchar" or value == "nvarchar" or value == "text" or value == "xml":
             field.type = FieldType.String
             field.size = size
-        elif value == "datetime" or value == "date":
+        elif value == "datetime" or value == "date" or value == "datetime2" or value == "smalldatetime" or value == "timestamp":
             field.type = FieldType.Datetime
             field.size = 0
         elif value == "none" or value == "undefined":
             field.type = FieldType.Undefined
             field.size = 0
+        elif value == "uniqueidentifier":
+            field.type = FieldType.UniqueIdentifier
+            field.size = 0
+        elif value == "sysname":
+            field.type = FieldType.String
+            field.size = 128
         else:
             raise DatatypeException("Unknown field type {}".format(value))
         field.default = default

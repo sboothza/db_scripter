@@ -1,6 +1,6 @@
 from typing import List
 from sb_serializer import Naming, HardSerializer
-from .database_objects import Table, Database, FieldType, KeyType
+from database_objects import Table, Database, FieldType, KeyType
 
 
 class Adaptor(object):

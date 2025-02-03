@@ -5,25 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5f1eabdb-579d-4cab-b10a-e0cd6ca35278" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/db_scripter.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/readme.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/adaptor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/adaptor_factory.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/common.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/database_objects.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/mysql_adaptor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/pgsql_adaptor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/db_scripter/sqlite_adaptor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bigworddictionary.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/dictionary.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/db_scripter/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/db_scripter.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/db_scripter.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/adaptor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/database_objects.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/database_objects.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,13 +41,15 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "S:/sboothza/db_scripter/src/db_scripter"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.main.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;S:/sboothza/db_scripter/src/db_scripter&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="S:\sboothza\db_scripter\src\db_scripter" />
@@ -67,7 +59,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-8336bb23522e-31b6be0877a2-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-241.19072.16" />
+        <option value="bundled-python-sdk-a5bc9544c897-aa17d162503b-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-243.23654.177" />
       </set>
     </attachedChunks>
   </component>
@@ -81,5 +73,21 @@
       <updated>1738436372688</updated>
     </task>
     <servers />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
+          <line>140</line>
+          <option name="timeStamp" value="7" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
+          <line>33</line>
+          <option name="timeStamp" value="9" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

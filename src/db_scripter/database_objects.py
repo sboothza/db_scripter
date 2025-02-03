@@ -24,8 +24,9 @@ class FieldType(Enum):
     Decimal = 4
     Datetime = 5
     Boolean = 6
-    Item = 7
-    ListOfItem = 8
+    UniqueIdentifier = 7,
+    Item = 8
+    ListOfItem = 9
 
     @classmethod
     def get_fieldtype(cls, value: str) -> FieldType:
@@ -206,7 +207,8 @@ class Table(object):
     keys: list[Key]
     foreign_keys: list[Key]
 
-    def __init__(self, name: Name = None, schema: Name = None, fields: list[Field] = [], pk: Key = None, keys: list[Key] = [],
+    def __init__(self, name: Name = None, schema: Name = None, fields: list[Field] = [], pk: Key = None,
+                 keys: list[Key] = [],
                  foreign_keys: list[Key] = []):
         self.name = name
         self.schema = schema
@@ -228,21 +230,46 @@ class Table(object):
 
 class View(Table):
     order_by: list[OrderByField]
+    definition: str
 
 
 class StoredProcedure:
     text: str
 
 
-class UDT:
+class UDTT(object):
+    name: Name
+    schema: Name
+    fields: list[Field]
+
+    def __init__(self, name: Name = None, schema: Name = None, fields: list[Field] = []):
+        self.name = name
+        self.schema = schema
+        self.fields: list[Field] = fields
+
+    def find_field(self, name: str) -> Field:
+        found_fields = [f for f in self.fields if f.name.raw().lower() == name.lower()]
+        if len(found_fields) > 0:
+            return found_fields[0]
+        else:
+            raise DataException("Could not find field")
+
+    def __str__(self):
+        return str(self.name)
+
+
+class UDDT:
     name: str
+    schema: Name
     type: FieldType
     size: int
     scale: int
     required: bool
 
-    def __init__(self, name: str = None, type: FieldType = FieldType.Undefined, size: int = 0, scale: int = 0, required: bool = False):
+    def __init__(self, name: str = None, schema: Name = None, type: FieldType = FieldType.Undefined, size: int = 0,
+                 scale: int = 0, required: bool = False):
         self.name = name
+        self.schema = schema
         self.type = type
         self.size = size
         self.scale = scale
@@ -253,13 +280,15 @@ class Database(object):
     name: Name
     tables: List[Table]
     stored_procedures: List[StoredProcedure]
-    udts: List[UDT]
+    uddts: List[UDDT]
+    udtts: List[UDTT]
 
     def __init__(self, name: Name = None):
         self.name = name
         self.tables: List[Table] = []
         self.stored_procedures: List[StoredProcedure] = []
-        self.udts: List[UDT] = []
+        self.uddts: List[UDDT] = []
+        self.udtts: List[UDTT] = []
 
     def get_table(self, name: str):
         result = [table for table in self.tables if table.name.raw() == name]
