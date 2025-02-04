@@ -24,9 +24,10 @@ class FieldType(Enum):
     Decimal = 4
     Datetime = 5
     Boolean = 6
-    UniqueIdentifier = 7,
-    Item = 8
-    ListOfItem = 9
+    UniqueIdentifier = 7
+    Binary = 8
+    Item = 9
+    ListOfItem = 10
 
     @classmethod
     def get_fieldtype(cls, value: str) -> FieldType:

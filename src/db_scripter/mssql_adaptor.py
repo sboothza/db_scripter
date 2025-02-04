@@ -1,7 +1,8 @@
 import re
-from typing import List
+from typing import List, Dict
 
 import pymssql
+from pymssql import Connection
 
 from adaptor import Adaptor
 from database_objects import Database, Table, KeyType, FieldType, Key, Field, DataException, DatatypeException, View, \
@@ -11,22 +12,45 @@ from database_objects import Database, Table, KeyType, FieldType, Key, Field, Da
 class MsSqlAdaptor(Adaptor):
     """ Connection string is mssql://user:pass@hostname/database """
     __blank_connection__ = "mssql://u:p@h/d"
+    options: dict[str, str]
 
     def __init__(self, connection, naming):
         super().__init__(connection, naming)
+        self.options = {}
 
-        match = re.match(r"mssql:\/\/(\w+):(\w+)@(\w+)\/(\w+)", self.connection)
+        match = re.match(r"mssql:\/\/((\w*):(\w*)@)?([^\/]+)\/([^\?]+)(\?.+)?", self.connection)
         if match:
-            self.user = match.group(1)
-            self.password = match.group(2)
-            self.hostname = match.group(3)
-            self.database = match.group(4)
+            self.user = match.group(2)
+            self.password = match.group(3)
+            self.hostname = match.group(4)
+            self.database = match.group(5)
+            options = match.group(6)
+            options_match = re.findall(r"(\w+)=(\w+)", options)
+            for option_match in options_match:
+                self.options[option_match[0]] = option_match[1]
+
         else:
             raise DataException("Invalid connection string")
 
+    def get_option(self, name: str, default: str) -> str:
+        if name not in self.options.keys():
+            return default
+        return self.options[name]
+
+    def connect(self) -> Connection:
+        connection = None
+        if self.get_option("integrated_authentication", "False") == "True":
+            connection = pymssql.connect(host=self.hostname, database=self.database)
+        else:
+            connection = pymssql.connect(user=self.user, password=self.password, host=self.hostname,
+                                   database=self.database)
+
+        cursor = connection.cursor(as_dict=True)
+        cursor.execute("select GETDATE() as d;")
+        return connection
+
     def import_schema(self, db_name: str) -> Database:
-        connection = pymssql.connect(user=self.user, password=self.password, host=self.hostname,
-                                     database=self.database)
+        connection = self.connect()
 
         if db_name is None:
             db_name = self.database
@@ -37,7 +61,7 @@ class MsSqlAdaptor(Adaptor):
         cursor.execute(
             "select schema_name(tab.schema_id) as schema_name, tab.name as table_name, col.column_id as id, col.name, "
             "t.name as data_type, col.max_length, col.precision, col.is_nullable, "
-            "COLUMNPROPERTY(object_id(schema_name(tab.schema_id)+'.'+tab.name), col.name, 'IsIdentity') as IS_IDENTITY, d.definition as default_value"
+            "COLUMNPROPERTY(object_id(schema_name(tab.schema_id)+'.'+tab.name), col.name, 'IsIdentity') as IS_IDENTITY, d.definition as default_value "
             "from sys.tables as tab "
             "inner join sys.columns as col on tab.object_id = col.object_id "
             "left join sys.types as t on col.user_type_id = t.user_type_id "
@@ -124,11 +148,11 @@ class MsSqlAdaptor(Adaptor):
         udtt_name = "none"
         udtt = None
         for row in cursor.fetchall():
-            new_udtt_name = f"{row["schema_name"]}.{row["view_name"]}"
+            new_udtt_name = f"{row["schema_name"]}.{row["Type Name"]}"
             if udtt_name != new_udtt_name:
                 print(new_udtt_name)
                 udtt_name = new_udtt_name
-                udtt = UDTT(row["view_name"], row["schema_name"])
+                udtt = UDTT(row["Type Name"], row["schema_name"])
                 database.udtts.append(udtt)
 
             field = Field(row["Column"], required=row["Nullable"] == 0)
@@ -261,8 +285,11 @@ class MsSqlAdaptor(Adaptor):
             field.type = FieldType.Decimal
             field.size = precision
             field.scale = scale
-        elif value == "string" or value == "varchar" or value == "char" or value == "nchar" or value == "nvarchar" or value == "text" or value == "xml":
+        elif value == "string" or value == "varchar" or value == "char" or value == "nchar" or value == "nvarchar":
             field.type = FieldType.String
+            field.size = size
+        elif value == "varbinary" or value == "text" or value == "xml":
+            field.type = FieldType.Binary
             field.size = size
         elif value == "datetime" or value == "date" or value == "datetime2" or value == "smalldatetime" or value == "timestamp":
             field.type = FieldType.Datetime
