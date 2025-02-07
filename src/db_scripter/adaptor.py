@@ -9,7 +9,10 @@ class Adaptor(object):
         self.naming = naming
 
     def import_schema(self, db_name: str) -> Database:
-        pass
+        ...
+
+    def write_schema(self, database: Database, path: str):
+        ...
 
     @staticmethod
     def generate_schema_definition(database: Database, definition_file: str, serializer: HardSerializer):
@@ -54,44 +57,11 @@ class Adaptor(object):
 
         return tables
 
-    def escape_field_list(self, values: List[str]) -> List[str]:
-        pass
-
-    def generate_drop_script(self, table: Table) -> str:
-        pass
-
     def generate_create_script(self, table: Table) -> str:
-        pass
-
-    def generate_table_exists_script(self, table: Table, db_name: str) -> str:
-        pass
-
-    def generate_count_script(self, table: Table) -> str:
-        pass
-
-    def generate_insert_script(self, table: Table) -> str:
-        pass
-
-    def generate_update_script(self, table: Table) -> str:
-        pass
-
-    def generate_delete_script(self, table: Table) -> str:
-        pass
-
-    def generate_fetch_by_id_script(self, table: Table) -> str:
-        pass
-
-    def generate_item_exists_script(self, table: Table) -> str:
-        pass
+        ...
 
     def get_field_type(self, field_type: FieldType) -> str:
-        pass
+        ...
 
-    def must_remap_field(self, field_type: FieldType) -> tuple[bool, FieldType]:
-        pass
-
-    def replace_parameters(self, query: str) -> str:
-        pass
-
-    def build_selection_list(self, fields: list) -> str:
-        pass
+    def escape_field_list(self, values: List[str]) -> List[str]:
+        ...

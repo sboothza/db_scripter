@@ -5,10 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5f1eabdb-579d-4cab-b10a-e0cd6ca35278" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/tests/test_dependency.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/adaptor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/common.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/common.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/db_scripter/database_objects.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/database_objects.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/db_scripter/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/mysql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/mysql_adaptor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/pgsql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/pgsql_adaptor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/sqlite_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/sqlite_adaptor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -38,11 +44,15 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "Python.main.executor": "Debug",
+    "Python tests.Python tests for test_dependency.TestDependency.test_many_dependencies.executor": "Debug",
+    "Python tests.Python tests for test_dependency.TestDependency.test_no_dependencies.executor": "Debug",
+    "Python tests.Python tests for test_dependency.TestDependency.test_one_dependency.executor": "Debug",
+    "Python.main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "master",
-    "last_opened_file_path": "S:/src/pvt/db_scripter/src/db_scripter"
+    "last_opened_file_path": "S:/src/pvt/db_scripter/src/db_scripter",
+    "settings.editor.selected.configurable": "preferences.keymap"
   }
 }]]></component>
   <component name="RecentsManager">
@@ -51,7 +61,7 @@
       <recent name="S:\sboothza\db_scripter" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python tests.Python tests for test_dependency.TestDependency.test_many_dependencies">
     <configuration name="main" type="PythonConfigurationType" factoryName="Python">
       <module name="db_scripter" />
       <option name="ENV_FILES" value="" />
@@ -75,6 +85,58 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="Python tests for test_dependency.TestDependency.test_many_dependencies" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
+      <module name="db_scripter" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;test_dependency.TestDependency.test_many_dependencies&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Python tests for test_dependency.TestDependency.test_no_dependencies" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
+      <module name="db_scripter" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;test_dependency.TestDependency.test_no_dependencies&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Python tests for test_dependency.TestDependency.test_one_dependency" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
+      <module name="db_scripter" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;test_dependency.TestDependency.test_one_dependency&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python tests.Python tests for test_dependency.TestDependency.test_many_dependencies" />
+        <item itemvalue="Python tests.Python tests for test_dependency.TestDependency.test_one_dependency" />
+        <item itemvalue="Python tests.Python tests for test_dependency.TestDependency.test_no_dependencies" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
@@ -99,33 +161,47 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
-          <line>163</line>
-          <option name="timeStamp" value="7" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
-          <line>57</line>
-          <option name="timeStamp" value="9" />
+          <line>32</line>
+          <option name="timeStamp" value="17" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/db_scripter/main.py</url>
-          <line>8</line>
-          <option name="timeStamp" value="10" />
+          <line>18</line>
+          <option name="timeStamp" value="24" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
-          <line>87</line>
-          <option name="timeStamp" value="13" />
+          <url>file://$PROJECT_DIR$/src/db_scripter/main.py</url>
+          <line>20</line>
+          <option name="timeStamp" value="26" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
-          <line>113</line>
-          <option name="timeStamp" value="14" />
+          <url>file://$PROJECT_DIR$/src/db_scripter/main.py</url>
+          <line>14</line>
+          <option name="timeStamp" value="29" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
-          <line>133</line>
-          <option name="timeStamp" value="15" />
+          <url>file://$PROJECT_DIR$/src/db_scripter/main.py</url>
+          <line>26</line>
+          <option name="timeStamp" value="31" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/db_scripter/database_objects.py</url>
+          <option name="timeStamp" value="32" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/tests/test_dependency.py</url>
+          <line>47</line>
+          <option name="timeStamp" value="33" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/tests/test_dependency.py</url>
+          <line>58</line>
+          <option name="timeStamp" value="35" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/tests/test_dependency.py</url>
+          <line>24</line>
+          <option name="timeStamp" value="37" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

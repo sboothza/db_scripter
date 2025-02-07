@@ -1,4 +1,10 @@
+import os.path
 from pathlib import Path
+
+
+def create_dir(path: str) -> str:
+    if not os.path.exists(path):
+        os.mkdir(path)
 
 
 def get_fullname(path: str) -> str:

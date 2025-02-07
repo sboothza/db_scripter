@@ -42,7 +42,7 @@ class SqliteAdaptor(Adaptor):
     def generate_create_script(self, table: Table) -> str:
         sql: list[str] = []
         for field in table.fields:
-            sql.append(f"\"{field.name.raw()}\" {self.get_field_type(field.type)} ")
+            sql.append(f"\"{field.name.raw()}\" {self.get_field_type(field.generic_type)} ")
         if table.pk:
             sql.append(f"PRIMARY KEY ({','.join(self.escape_field_list(table.pk.fields))})")
 
@@ -264,7 +264,7 @@ class SqliteAdaptor(Adaptor):
 
         if table.pk is not None and len(table.pk.fields) == 1:
             pk_field = table.find_field(table.pk.fields[0])
-            if pk_field.type == FieldType.Integer:
+            if pk_field.generic_type == FieldType.Integer:
                 pk_field.auto_increment = True
 
         return table

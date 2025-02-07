@@ -99,9 +99,9 @@ class MySqlAdaptor(Adaptor):
 
     @staticmethod
     def get_field_size(field: Field) -> str:
-        if field.type == FieldType.String:
+        if field.generic_type == FieldType.String:
             return f"({field.size})"
-        elif field.type == FieldType.Decimal:
+        elif field.generic_type == FieldType.Decimal:
             return f"({field.size},{field.scale})"
         return ""
 
@@ -113,13 +113,13 @@ class MySqlAdaptor(Adaptor):
 
     @staticmethod
     def get_field_default(field: Field) -> str:
-        if field.type == FieldType.String or field.type == FieldType.Datetime:
+        if field.generic_type == FieldType.String or field.generic_type == FieldType.Datetime:
             return f"'{field.default}'"
 
     def generate_create_script(self, table: Table) -> str:
         sql: list[str] = []
         for field in table.fields:
-            sql.append(f"`{field.name.raw()}` {self.get_field_type(field.type, field.size, field.scale)}"
+            sql.append(f"`{field.name.raw()}` {self.get_field_type(field.generic_type, field.size, field.scale)}"
                        f"{self.get_field_size(field)} {'NOT NULL' if field.required else 'NULL'}"
                        f"{' AUTO_INCREMENT' if field.auto_increment else ''}"
                        f"{' DEFAULT (' + self.get_field_default(field) + ')' if field.default else ''}")
@@ -191,41 +191,41 @@ class MySqlAdaptor(Adaptor):
         value = value.lower()
         default = None if default is None else default.decode("utf-8")
         if value == "integer" or value == "int":
-            field.type = FieldType.Integer
+            field.generic_type = FieldType.Integer
             field.size = 4
         elif value == "bigint":
-            field.type = FieldType.Integer
+            field.generic_type = FieldType.Integer
             field.size = 8
         elif value == "tinyint":
-            field.type = FieldType.Integer
+            field.generic_type = FieldType.Integer
             field.size = 1
         elif value == "smallint":
-            field.type = FieldType.Integer
+            field.generic_type = FieldType.Integer
             field.size = 2
         elif value == "mediumint":
-            field.type = FieldType.Integer
+            field.generic_type = FieldType.Integer
             field.size = 3
         elif value == "float" or value == "real":
-            field.type = FieldType.Float
+            field.generic_type = FieldType.Float
             field.size = 4
         elif value == "double":
-            field.type = FieldType.Float
+            field.generic_type = FieldType.Float
             field.size = 8
         elif value == "boolean" or value == "bool":
-            field.type = FieldType.Boolean
+            field.generic_type = FieldType.Boolean
             field.size = 1
         elif value == "decimal" or value == "money":
-            field.type = FieldType.Decimal
+            field.generic_type = FieldType.Decimal
             field.size = precision
             field.scale = scale
         elif value == "string" or value == "varchar" or value == "char":
-            field.type = FieldType.String
+            field.generic_type = FieldType.String
             field.size = size
         elif value == "datetime" or value == "date":
-            field.type = FieldType.Datetime
+            field.generic_type = FieldType.Datetime
             field.size = 0
         elif value == "none" or value == "undefined":
-            field.type = FieldType.Undefined
+            field.generic_type = FieldType.Undefined
             field.size = 0
         else:
             raise DatatypeException("Unknown field type {}".format(value))

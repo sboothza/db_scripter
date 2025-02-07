@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum, auto, Flag
 from typing import List
 
 from sb_serializer import Name
@@ -12,22 +12,33 @@ class DatatypeException(DataException):
     pass
 
 
+class QualifiedName:
+    schema: str
+    name: str
+
+    def __init__(self, schema: str = None, name: str = None):
+        self.schema = schema
+        self.name = name
+
+    def __str__(self):
+        return f"{self.schema}.{self.name}"
+
+
 class FieldType:
     pass
 
 
-class FieldType(Enum):
-    Undefined = 0
-    Integer = 1
-    String = 2
-    Float = 3
-    Decimal = 4
-    Datetime = 5
-    Boolean = 6
-    UniqueIdentifier = 7
-    Binary = 8
-    Item = 9
-    ListOfItem = 10
+class FieldType(Flag):
+    Undefined = auto()
+    Integer = auto()
+    String = auto()
+    Float = auto()
+    Decimal = auto()
+    Datetime = auto()
+    Boolean = auto()
+    UniqueIdentifier = auto()
+    Binary = auto()
+    Hierarchy = auto()
 
     @classmethod
     def get_fieldtype(cls, value: str) -> FieldType:
@@ -44,10 +55,10 @@ class FieldType(Enum):
             return FieldType.Boolean
         elif value == "decimal" or value == "money":
             return FieldType.Decimal
-        elif value == "__item__":
-            return FieldType.Item
-        elif value == "[__item__]":
-            return FieldType.ListOfItem
+        elif value == "binary":
+            return FieldType.Binary
+        elif value == "uniqueidentifier":
+            return FieldType.UniqueIdentifier
         elif value == "none":
             return FieldType.Undefined
         else:
@@ -66,42 +77,73 @@ class FieldType(Enum):
             return "Boolean"
         elif self == FieldType.Decimal:
             return "Decimal"
-        elif self == FieldType.Item:
-            return "__Item__"
-        elif self == FieldType.ListOfItem:
-            return "[__Item__]"
+        elif self == FieldType.Binary:
+            return "Binary"
+        elif self == FieldType.UniqueIdentifier:
+            return "UniqueIdentifier"
         elif self == FieldType.Undefined:
             return "None"
         else:
             raise DatatypeException("Unknown field type ")
 
 
+class SchemaObject:
+    name: QualifiedName
+
+    def __init__(self, name: QualifiedName = None):
+        self.name = name
+
+
+class UDDT(SchemaObject):
+    name: QualifiedName
+    generic_type: FieldType
+    size: int
+    scale: int
+    required: bool
+    native_type: str
+
+    def __init__(self, name: QualifiedName = None, generic_type: FieldType = FieldType.Undefined, size: int = 0,
+                 scale: int = 0, required: bool = False, native_type: str = None):
+        super().__init__(name)
+        self.generic_type = generic_type
+        self.size = size
+        self.scale = scale
+        self.required = required
+        self.native_type = native_type
+
+    def __str__(self):
+        return self.name
+
+
 class Field(object):
     name: Name
-    type: FieldType
+    generic_type: FieldType | UDDT
     size: int
     scale: int
     auto_increment: bool
     default: str
     required: bool
+    native_type: str
 
-    def __init__(self, name: Name = None, field_type: FieldType = FieldType.Undefined, size: int = 0, scale: int = 0,
-                 auto_increment: bool = False, default=None, required: bool = False):
+    def __init__(self, name: Name = None, generic_type: FieldType | UDDT = FieldType.Undefined, size: int = 0,
+                 scale: int = 0, auto_increment: bool = False, default=None, required: bool = False,
+                 native_type: str = None):
         self.name = name
-        self.type = field_type
+        self.generic_type = generic_type
         self.size = size
         self.scale = scale
         self.auto_increment = auto_increment
         self.default = default
         self.required = required
+        self.native_type = native_type
 
     def __str__(self):
-        return f"{str(self.name)} {self.type} ({self.size},{self.scale}) {'AUTOINC ' if self.auto_increment else ''}" \
+        return f"{str(self.name)} {self.generic_type} ({self.size},{self.scale}) {'AUTOINC ' if self.auto_increment else ''}" \
                f"{'DEFAULT ' + self.default + ' ' if self.default else ''}{'NOT NULL' if self.required else 'NULL'}"
 
 
 class KeyType:
-    pass
+    ...
 
 
 class KeyType(Enum):
@@ -189,37 +231,43 @@ class AscendingOrDescendingType(Enum):
 
 
 class OrderByField(object):
-    field: Field
+    field: str
     asc_or_desc: AscendingOrDescendingType
 
-    def __init__(self, field: Field = None, asc_or_desc: AscendingOrDescendingType = AscendingOrDescendingType.Unknown):
+    def __init__(self, field: str = None, asc_or_desc: AscendingOrDescendingType = AscendingOrDescendingType.Unknown):
         self.field = field
         self.asc_or_desc = asc_or_desc
 
     def __str__(self):
-        return f"\"{self.field.name.raw()}\" "
+        return f"\"{self.field}\" "
 
 
-class Table(object):
-    name: Name
-    schema: Name
+class Dependancy:
+    obj: QualifiedName
+    referenced_obj: QualifiedName
+    obj_type: str
+
+    def __init__(self, obj: QualifiedName = None, referenced_obj: QualifiedName = None, obj_type: str = None):
+        self.obj = obj
+        self.referenced_obj = referenced_obj
+        self.obj_type = obj_type
+
+
+class Table(SchemaObject):
     fields: list[Field]
     pk: Key
     keys: list[Key]
     foreign_keys: list[Key]
 
-    def __init__(self, name: Name = None, schema: Name = None, fields: list[Field] = [], pk: Key = None,
-                 keys: list[Key] = [],
-                 foreign_keys: list[Key] = []):
-        self.name = name
-        self.schema = schema
-        self.fields: list[Field] = fields
-        self.pk: Key | None = pk
-        self.keys: list[Key] = keys
-        self.foreign_keys: list[Key] = foreign_keys
+    def __init__(self, name: QualifiedName = None):
+        super().__init__(name)
+        self.fields: list[Field] = []
+        self.pk: Key | None = None
+        self.keys: list[Key] = []
+        self.foreign_keys: list[Key] = []
 
     def find_field(self, name: str) -> Field:
-        found_fields = [f for f in self.fields if f.name.raw().lower() == name.lower()]
+        found_fields = [f for f in self.fields if f.name == name.lower()]
         if len(found_fields) > 0:
             return found_fields[0]
         else:
@@ -230,26 +278,27 @@ class Table(object):
 
 
 class View(Table):
-    order_by: list[OrderByField]
     definition: str
 
 
-class StoredProcedure:
+class StoredProcedure(SchemaObject):
     text: str
 
+    def __init__(self, name: QualifiedName = None, text: str = None):
+        super().__init__(name)
+        self.text = text
 
-class UDTT(object):
-    name: Name
-    schema: Name
+
+class UDTT(SchemaObject):
+    name: QualifiedName
     fields: list[Field]
 
-    def __init__(self, name: Name = None, schema: Name = None, fields: list[Field] = []):
-        self.name = name
-        self.schema = schema
+    def __init__(self, name: QualifiedName = None, fields: list[Field] = []):
+        super().__init__(name)
         self.fields: list[Field] = fields
 
     def find_field(self, name: str) -> Field:
-        found_fields = [f for f in self.fields if f.name.raw().lower() == name.lower()]
+        found_fields = [f for f in self.fields if f.name.lower() == name.lower()]
         if len(found_fields) > 0:
             return found_fields[0]
         else:
@@ -259,46 +308,104 @@ class UDTT(object):
         return str(self.name)
 
 
-class UDDT:
-    name: str
-    schema: Name
-    type: FieldType
-    size: int
-    scale: int
-    required: bool
+class FunctionType:
+    ...
 
-    def __init__(self, name: str = None, schema: Name = None, type: FieldType = FieldType.Undefined, size: int = 0,
-                 scale: int = 0, required: bool = False):
-        self.name = name
-        self.schema = schema
+
+class FunctionType(Enum):
+    ScalarFunction = 1
+    TableFunction = 2
+
+    @staticmethod
+    def from_str(name: str) -> FunctionType:
+        if name == "function":
+            return FunctionType.ScalarFunction
+        elif name == "table function":
+            return FunctionType.TableFunction
+        else:
+            raise DataException("Couldn't find type!")
+
+
+class Function(SchemaObject):
+    text: str
+    type: FunctionType
+
+    def __init__(self, name: QualifiedName = None, text: str = None,
+                 type: FunctionType = FunctionType.ScalarFunction):
+        super().__init__(name)
+        self.text = text
         self.type = type
-        self.size = size
-        self.scale = scale
-        self.required = required
 
 
 class Database(object):
     name: Name
     tables: List[Table]
     stored_procedures: List[StoredProcedure]
+    functions: List[Function]
     uddts: List[UDDT]
     udtts: List[UDTT]
+    dependancies: List[Dependancy]
 
     def __init__(self, name: Name = None):
         self.name = name
         self.tables: List[Table] = []
         self.stored_procedures: List[StoredProcedure] = []
+        self.functions: List[Function] = []
         self.uddts: List[UDDT] = []
         self.udtts: List[UDTT] = []
+        self.dependancies: List[Dependancy] = []
 
-    def get_table(self, name: str):
-        result = [table for table in self.tables if table.name.raw() == name]
+    def get_object(self, name: QualifiedName, type: str) -> SchemaObject | None:
+        if type == "Table" or type == "View":
+            return self.get_table(name)
+        elif type == "StoredProcedure":
+            return self.get_stored_procedure(name)
+        elif type == "UDDT":
+            return self.get_type(name.name)
+        elif type == "UDTT":
+            return self.get_table_type(name)
+        elif type == "Function":
+            return self.get_function(name)
+        else:
+            raise DataException("Couldn't find type!")
+
+    def get_table(self, name: QualifiedName) -> Table | None:
+        result = [table for table in self.tables if
+                  table.name.name.lower() == name.name.lower() and table.name.schema.lower() == name.schema.lower()]
         if len(result) > 0:
             return result[0]
         return None
 
-    def get_stored_procedure(self, name: str):
-        result = [sp for sp in self.stored_procedures if sp.name == name]
+    def get_stored_procedure(self, name: QualifiedName) -> StoredProcedure | None:
+        result = [sp for sp in self.stored_procedures if
+                  sp.name.name.lower() == name.name.lower() and sp.name.schema.lower() == name.schema.lower()]
         if len(result) > 0:
             return result[0]
         return None
+
+    def get_function(self, name: QualifiedName) -> Function | None:
+        result = [f for f in self.functions if f.name.name.lower() == name.name.lower()]
+        if len(result) > 0:
+            return result[0]
+        return None
+
+    def get_type(self, name: str) -> UDDT | None:
+        result = [t for t in self.uddts if t.name.name.lower() == name.lower()]
+        if len(result) > 0:
+            return result[0]
+        return None
+
+    def get_table_type(self, name: QualifiedName) -> UDTT | None:
+        result = [t for t in self.udtts if t.name.name.lower() == name.name.lower()]
+        if len(result) > 0:
+            return result[0]
+        return None
+
+    def trim_db(self, count: int):
+        self.tables = self.tables[:count]
+        self.stored_procedures = self.stored_procedures[:count]
+        self.udtts = self.udtts[:count]
+        self.dependancies = [d for d in self.dependancies if
+                             self.get_table(d.obj) is None or self.get_table(d.referenced_obj) is None]
+
+        self.dependancies = self.dependancies[:count]
