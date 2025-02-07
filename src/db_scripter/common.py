@@ -2,8 +2,11 @@ import os.path
 from pathlib import Path
 
 
-def create_dir(path: str) -> str:
-    if not os.path.exists(path):
+def create_dir(path: str, delete:bool=False):
+    if not os.path.exists(path) or not delete:
+        os.mkdir(path)
+    else:
+        os.rmdir(path)
         os.mkdir(path)
 
 

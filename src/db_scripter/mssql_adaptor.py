@@ -5,6 +5,7 @@ from typing import List
 import pymssql
 from pymssql import Connection
 from sb_serializer import Name
+from toposort import toposort_flatten
 
 from adaptor import Adaptor
 from database_objects import Database, Table, KeyType, FieldType, Field, DataException, DatatypeException, View, \
@@ -240,39 +241,45 @@ class MsSqlAdaptor(Adaptor):
         connection.close()
         return database
 
-    def calculate_sp_dependencies(self, database:Database)->List[Table]:
-        master_list = database.tables[:]
-        current_list :List[Table]=[]
-        index = 0
-        while (True):
-            current:Table = master_list[index]
-            current_dependancies = [dep for dep in database.dependancies if dep.obj.name == current.name.name and dep.obj.schema == current.name.schema]
-            if len(current_dependancies) == 0:
-                current_list.append(current)
-                continue
-            elif 
+    def calculate_sp_dependencies(self, database: Database) -> List[StoredProcedure]:
+        dependencies = {d.obj: [] for d in database.dependancies}
+        for item in database.dependancies:
+            dependencies[item.obj].append(item.referenced_obj)
 
+        graph = dict(zip(dependencies.keys(), map(set, dependencies.values())))
+        sorted_graph = toposort_flatten(graph, sort=True)
 
+        remaining_list = [item.name for item in database.stored_procedures if item.name not in sorted_graph]
+
+        sorted_graph.extend(remaining_list)
+
+        sorted_sps = [database.get_stored_procedure(sp_name) for sp_name in sorted_graph]
+
+        return sorted_sps
 
     def write_schema(self, database: Database, path: str):
         # write tables
         print("Writing table scripts....")
         local_path = os.path.join(path, "tables")
-        create_dir(local_path)
+
+        create_dir(local_path, delete=True)
+
+        counter = 1
         for table in database.tables:
-            with open(os.path.join(local_path, table.name.name + ".sql"), "w", 1024, encoding="utf8") as f:
+            with open(os.path.join(local_path, f"{counter:03}-{table.name.name}.sql"), "w", 1024, encoding="utf8") as f:
                 f.write(self.generate_create_script(table))
                 f.flush()
+            counter += 1
 
         print("Writing drop sp scripts....")
         local_path = os.path.join(path, "sp")
-        create_dir(local_path)
+        create_dir(local_path, de)
 
         # calculating dependencies
-
+        stored_procs = self.calculate_sp_dependencies(database)
 
         with open(os.path.join(local_path, "drop_sp.sql"), "w", 1024, encoding="utf8") as f:
-            for sp in database.stored_procedures:
+            for sp in stored_procs:
                 sql = (
                     f"IF EXISTS ( SELECT * FROM sysobjects WHERE id = object_id(N'{sp.name.schema}.{sp.name.name}') and "
                     f"OBJECTPROPERTY(id, N'IsProcedure') = 1 )\nBEGIN\n\tDROP PROCEDURE {sp.name.schema}.{sp.name.name}\nEND\n\n")
@@ -317,10 +324,12 @@ class MsSqlAdaptor(Adaptor):
         print("Writing SP scripts....")
         local_path = os.path.join(path, "sp")
         create_dir(local_path)
-        for sp in database.stored_procedures:
-            with open(os.path.join(local_path, sp.name.name + ".sql"), "w", 1024, encoding="utf8") as f:
+        counter = 1
+        for sp in stored_procs:
+            with open(os.path.join(local_path, f"{counter:03}-{sp.name.name}.sql"), "w", 1024, encoding="utf8") as f:
                 f.write(self.generate_create_sp_script(sp))
                 f.flush()
+            counter += 1
 
     @staticmethod
     def get_object_type(name: str) -> str | None:

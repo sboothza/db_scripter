@@ -5,16 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5f1eabdb-579d-4cab-b10a-e0cd6ca35278" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/tests/test_dependency.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/db_scripter/adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/adaptor.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/db_scripter/common.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/common.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/db_scripter/database_objects.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/database_objects.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/db_scripter/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/db_scripter/mysql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/mysql_adaptor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/db_scripter/pgsql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/pgsql_adaptor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/db_scripter/sqlite_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/sqlite_adaptor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,7 +37,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "Python tests.Python tests for test_dependency.TestDependency.test_many_dependencies.executor": "Debug",
+    "Python tests.Python tests for test_dependency.TestDependency.test_many_dependencies.executor": "Run",
     "Python tests.Python tests for test_dependency.TestDependency.test_no_dependencies.executor": "Debug",
     "Python tests.Python tests for test_dependency.TestDependency.test_one_dependency.executor": "Debug",
     "Python.main.executor": "Run",
@@ -61,7 +54,7 @@
       <recent name="S:\sboothza\db_scripter" />
     </key>
   </component>
-  <component name="RunManager" selected="Python tests.Python tests for test_dependency.TestDependency.test_many_dependencies">
+  <component name="RunManager" selected="Python.main">
     <configuration name="main" type="PythonConfigurationType" factoryName="Python">
       <module name="db_scripter" />
       <option name="ENV_FILES" value="" />
@@ -161,7 +154,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
-          <line>32</line>
+          <line>33</line>
           <option name="timeStamp" value="17" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
