@@ -9,7 +9,7 @@ from toposort import toposort_flatten
 
 from adaptor import Adaptor
 from database_objects import Database, Table, KeyType, FieldType, Field, DataException, DatatypeException, View, \
-    UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName
+    UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName, Dependancy
 from src.db_scripter.common import create_dir
 from src.db_scripter.database_objects import Function
 
@@ -197,6 +197,30 @@ class MsSqlAdaptor(Adaptor):
             sp = StoredProcedure(QualifiedName(row["schema_name"], row["name"]), row["text"])
             database.stored_procedures.append(sp)
 
+        print("Processing dependencies...")
+        cursor.execute(
+            "SELECT OBJECT_NAME(referencing_id) AS entity_name, SCHEMA_NAME(o.schema_id) as entity_schema, "
+            "o.type as entity_type, referenced_entity_name, referenced_schema_name, ref.type as referenced_type "
+            "FROM sys.sql_expression_dependencies AS sed "
+            "INNER JOIN sys.objects AS o ON sed.referencing_id = o.object_id "
+            "inner join sys.objects as ref on ref.object_id = referenced_id "
+            "where ref.type in ('P', 'FN') "
+            "and o.type in ('P', 'FN')")
+
+        for row in cursor.fetchall():
+            print(f"{row["entity_schema"]}.{row["entity_name"]} => {row["referenced_schema_name"]}.{row["referenced_entity_name"]}")
+
+            obj = database.get_object(QualifiedName(row["entity_schema"], row["entity_name"]),
+                                      self.get_object_type(row["entity_type"]))
+            if obj is None:
+                raise DataException("Couldn't find object!")
+            ref = database.get_object(QualifiedName(row["referenced_schema_name"], row["referenced_entity_name"]),
+                                      self.get_object_type(row["referenced_type"]))
+            if ref is None:
+                raise DataException("Couldn't find object!")
+            dep = Dependancy(obj.name, ref.name, self.get_object_type(row["referenced_type"]))
+            database.dependancies.append(dep)
+
         # print("Processing dependencies...")
         # cursor.execute(
         #     "select distinct OBJECT_SCHEMA_NAME (o.id) as schema_name, o.name, o.xtype, "
@@ -273,13 +297,15 @@ class MsSqlAdaptor(Adaptor):
 
         print("Writing drop sp scripts....")
         local_path = os.path.join(path, "sp")
-        create_dir(local_path, de)
+        create_dir(local_path, delete=True)
 
         # calculating dependencies
         stored_procs = self.calculate_sp_dependencies(database)
+        reversed_sp = stored_procs[:]
+        reversed_sp.reverse()
 
         with open(os.path.join(local_path, "drop_sp.sql"), "w", 1024, encoding="utf8") as f:
-            for sp in stored_procs:
+            for sp in reversed_sp:
                 sql = (
                     f"IF EXISTS ( SELECT * FROM sysobjects WHERE id = object_id(N'{sp.name.schema}.{sp.name.name}') and "
                     f"OBJECTPROPERTY(id, N'IsProcedure') = 1 )\nBEGIN\n\tDROP PROCEDURE {sp.name.schema}.{sp.name.name}\nEND\n\n")

@@ -205,3 +205,51 @@ SELECT  UserType.[name] AS UserType
              AND SystemType.is_user_defined = 0
  WHERE  UserType.is_user_defined = 1
  ORDER BY UserType.[name]
+
+
+
+ SELECT OBJECT_NAME(referencing_id) AS entity_name, SCHEMA_NAME(o.schema_id) as entity_schema, o.type as entity_type,
+    referenced_entity_name, referenced_schema_name, ref.type as referenced_type
+FROM sys.sql_expression_dependencies AS sed
+INNER JOIN sys.objects AS o ON sed.referencing_id = o.object_id
+inner join sys.objects as ref on ref.object_id = referenced_id
+where ref.type in ('P', 'FN')
+and o.type in ('P', 'FN')
+
+
+WHERE referencing_id = OBJECT_ID(N'dbo.test2');
+
+
+
+
+go
+create proc test1 @dt datetime out as
+begin
+	set @dt = GETDATE()
+end
+go
+
+create proc test2 @dt datetime out as
+begin
+	exec test1 @dt
+end
+go
+
+declare @d datetime
+exec test2 @d
+print @d
+
+go
+create function func1() returns datetime as
+begin
+	return getdate()
+end
+
+go
+create function func2() returns datetime as
+begin
+	return dbo.func1()
+end
+
+
+print dbo.func2()

@@ -10,7 +10,7 @@ def main():
     naming = Naming("../../dictionary.txt", "../../bigworddictionary.txt")
     adaptor = AdaptorFactory.get_adaptor_for_connection_string("mssql://sa:E15ag0at123@localhost/AdventureWorks", naming)
     # adaptor = AdaptorFactory.get_adaptor_for_connection_string("mssql://DV4-POLSQLAG-01/Polly_C?integrated_authentication=True", naming)
-    db = adaptor.import_schema("Polly_C")
+    db = adaptor.import_schema("AdventureWorks")
 
     # db.trim_db(50)
 

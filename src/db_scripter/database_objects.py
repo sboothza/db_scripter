@@ -23,6 +23,18 @@ class QualifiedName:
     def __str__(self):
         return f"{self.schema}.{self.name}"
 
+    def __gt__(self, other):
+        return str(self) > str(other)
+
+    def __lt__(self, other):
+        return str(self) < str(other)
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+    def __hash__(self):
+        return hash(str(self))
+
 
 class FieldType:
     pass
