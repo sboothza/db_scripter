@@ -1,3 +1,30 @@
+TODO:
+Finish importer
+    - table import - done
+    - view import - done
+    - sp import - done
+    - function import - done
+    - udt / udtt import - done
+    - dependency import
+    - keys and index import
+    - reference import
+
+Finish exporter
+    - export drop statements (in order)
+    - export create types (in order)
+    - export create sps (in order)
+    - export create tables (in order)
+    - export create keys and indexes (in order)
+    - export references (in order)
+
+Finish Diff generator
+    - generate diff model from existing model and existing schema (model)
+    - export scripts for diff
+
+Finish Script Executor
+    - Execute scripts in order according to rules
+
+
 SELECT * FROM INFORMATION_SCHEMA.SCHEMATA
 select * from sys.schemas where name not in (select name from sys.database_principals)
 select * from sys.database_principals
@@ -253,3 +280,34 @@ end
 
 
 print dbo.func2()
+
+
+select st.name as table_name, SCHEMA_NAME(st.schema_id) as schema_name,  chk.definition, chk.name as constraint_name, chk.type
+from sys.check_constraints chk
+inner join sys.columns col
+ on chk.parent_object_id = col.object_id
+inner join sys.tables st
+ on chk.parent_object_id = st.object_id
+ order by st.name, col.column_id
+
+
+SELECT  obj.name AS FK_NAME,
+    sch.name AS [schema_name],
+    tab1.name AS [table],
+    col1.name AS [column],
+    tab2.name AS [referenced_table],
+    col2.name AS [referenced_column]
+FROM sys.foreign_key_columns fkc
+INNER JOIN sys.objects obj
+    ON obj.object_id = fkc.constraint_object_id
+INNER JOIN sys.tables tab1
+    ON tab1.object_id = fkc.parent_object_id
+INNER JOIN sys.schemas sch
+    ON tab1.schema_id = sch.schema_id
+INNER JOIN sys.columns col1
+    ON col1.column_id = parent_column_id AND col1.object_id = tab1.object_id
+INNER JOIN sys.tables tab2
+    ON tab2.object_id = fkc.referenced_object_id
+INNER JOIN sys.columns col2
+    ON col2.column_id = referenced_column_id AND col2.object_id = tab2.object_id
+order by obj.name
