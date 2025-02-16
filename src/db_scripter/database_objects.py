@@ -117,7 +117,7 @@ class UDDT(SchemaObject):
 
 class Field(object):
     name: Name
-    generic_type: FieldType | UDDT
+    generic_type: FieldType | str
     size: int
     scale: int
     auto_increment: bool
@@ -125,7 +125,7 @@ class Field(object):
     required: bool
     native_type: str
 
-    def __init__(self, name: Name = None, generic_type: FieldType | UDDT = FieldType.Undefined, size: int = 0,
+    def __init__(self, name: Name = None, generic_type: FieldType | str = FieldType.Undefined, size: int = 0,
                  scale: int = 0, auto_increment: bool = False, default=None, required: bool = False,
                  native_type: str = None):
         self.name = name
@@ -344,7 +344,7 @@ class Database(object):
     functions: List[Function]
     uddts: List[UDDT]
     udtts: List[UDTT]
-    dependancies: List[Dependancy]
+    dependencies: List[Dependancy]
 
     def __init__(self, name: Name = None):
         self.name = name
@@ -353,7 +353,7 @@ class Database(object):
         self.functions: List[Function] = []
         self.uddts: List[UDDT] = []
         self.udtts: List[UDTT] = []
-        self.dependancies: List[Dependancy] = []
+        self.dependencies: List[Dependancy] = []
 
     def get_object(self, name: QualifiedName, type: str) -> SchemaObject | None:
         if type == "Table" or type == "View":
@@ -405,7 +405,7 @@ class Database(object):
         self.tables = self.tables[:count]
         self.stored_procedures = self.stored_procedures[:count]
         self.udtts = self.udtts[:count]
-        self.dependancies = [d for d in self.dependancies if
+        self.dependencies = [d for d in self.dependencies if
                              self.get_table(d.obj) is None or self.get_table(d.referenced_obj) is None]
 
-        self.dependancies = self.dependancies[:count]
+        self.dependencies = self.dependencies[:count]

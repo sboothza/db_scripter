@@ -9,7 +9,7 @@ from toposort import toposort_flatten
 
 from adaptor import Adaptor
 from database_objects import Database, Table, KeyType, FieldType, Field, DataException, DatatypeException, View, \
-    UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName
+    UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName, Dependancy
 from src.db_scripter.common import create_dir
 from src.db_scripter.database_objects import Function
 
@@ -197,53 +197,53 @@ class MsSqlAdaptor(Adaptor):
             sp = StoredProcedure(QualifiedName(row["schema_name"], row["name"]), row["text"])
             database.stored_procedures.append(sp)
 
-        # print("Processing dependencies...")
-        # cursor.execute(
-        #     "select distinct OBJECT_SCHEMA_NAME (o.id) as schema_name, o.name, o.xtype, "
-        #     "OBJECT_SCHEMA_NAME (ref.id) as ref_schema_name, ref.name as referenced, ref.xtype as reftype "
-        #     "from sys.sql_dependencies d "
-        #     "inner join sys.sysobjects o on o.id = d.object_id "
-        #     "inner join sys.sysobjects ref on ref.id = d.referenced_major_id")
-        #
-        # for row in cursor.fetchall():
-        #     print(f"{row["schema_name"]}.{row["name"]} => {row["ref_schema_name"]}.{row["referenced"]}")
-        #     obj = database.get_object(QualifiedName(row["schema_name"], row["name"]),
-        #                               self.get_object_type(row["xtype"]))
-        #     if obj is None:
-        #         raise DataException("Couldn't find object!")
-        #     ref = database.get_object(QualifiedName(row["ref_schema_name"], row["referenced"]),
-        #                               self.get_object_type(row["reftype"]))
-        #     if ref is None:
-        #         raise DataException("Couldn't find object!")
-        #     dep = Dependancy(obj.name, ref.name, self.get_object_type(row["reftype"]))
-        #     database.dependancies.append(dep)
-        #
-        # print("Processing udtt dependencies...")
-        # cursor.execute(
-        #     "Select distinct SPECIFIC_SCHEMA, SPECIFIC_NAME, USER_DEFINED_TYPE_SCHEMA, USER_DEFINED_TYPE_NAME "
-        #     "From Information_Schema.PARAMETERS "
-        #     "Where USER_DEFINED_TYPE_NAME is not null "
-        #     "order by SPECIFIC_SCHEMA, SPECIFIC_NAME")
-        #
-        # for row in cursor.fetchall():
-        #     print(
-        #         f"{row["SPECIFIC_SCHEMA"]}.{row["SPECIFIC_NAME"]} => {row["USER_DEFINED_TYPE_SCHEMA"]}.{row["USER_DEFINED_TYPE_NAME"]}")
-        #     obj = database.get_object(QualifiedName(row["SPECIFIC_SCHEMA"], row["SPECIFIC_NAME"]), "StoredProcedure")
-        #     if obj is None:
-        #         raise DataException("Couldn't find object!")
-        #     ref = database.get_object(QualifiedName(row["USER_DEFINED_TYPE_SCHEMA"], row["USER_DEFINED_TYPE_NAME"]),
-        #                               self.get_object_type("UDTT"))
-        #     if ref is None:
-        #         raise DataException("Couldn't find object!")
-        #     dep = Dependancy(obj.name, ref.name, "UDTT")
-        #     database.dependancies.append(dep)
+        print("Processing dependencies...")
+        cursor.execute(
+            "select distinct OBJECT_SCHEMA_NAME (o.id) as schema_name, o.name, o.xtype, "
+            "OBJECT_SCHEMA_NAME (ref.id) as ref_schema_name, ref.name as referenced, ref.xtype as reftype "
+            "from sys.sql_dependencies d "
+            "inner join sys.sysobjects o on o.id = d.object_id "
+            "inner join sys.sysobjects ref on ref.id = d.referenced_major_id")
+
+        for row in cursor.fetchall():
+            print(f"{row["schema_name"]}.{row["name"]} => {row["ref_schema_name"]}.{row["referenced"]}")
+            obj = database.get_object(QualifiedName(row["schema_name"], row["name"]),
+                                      self.get_object_type(row["xtype"]))
+            if obj is None:
+                raise DataException("Couldn't find object!")
+            ref = database.get_object(QualifiedName(row["ref_schema_name"], row["referenced"]),
+                                      self.get_object_type(row["reftype"]))
+            if ref is None:
+                raise DataException("Couldn't find object!")
+            dep = Dependancy(obj.name, ref.name, self.get_object_type(row["reftype"]))
+            database.dependencies.append(dep)
+
+        print("Processing udtt dependencies...")
+        cursor.execute(
+            "Select distinct SPECIFIC_SCHEMA, SPECIFIC_NAME, USER_DEFINED_TYPE_SCHEMA, USER_DEFINED_TYPE_NAME "
+            "From Information_Schema.PARAMETERS "
+            "Where USER_DEFINED_TYPE_NAME is not null "
+            "order by SPECIFIC_SCHEMA, SPECIFIC_NAME")
+
+        for row in cursor.fetchall():
+            print(
+                f"{row["SPECIFIC_SCHEMA"]}.{row["SPECIFIC_NAME"]} => {row["USER_DEFINED_TYPE_SCHEMA"]}.{row["USER_DEFINED_TYPE_NAME"]}")
+            obj = database.get_object(QualifiedName(row["SPECIFIC_SCHEMA"], row["SPECIFIC_NAME"]), "StoredProcedure")
+            if obj is None:
+                raise DataException("Couldn't find object!")
+            ref = database.get_object(QualifiedName(row["USER_DEFINED_TYPE_SCHEMA"], row["USER_DEFINED_TYPE_NAME"]),
+                                      self.get_object_type("UDTT"))
+            if ref is None:
+                raise DataException("Couldn't find object!")
+            dep = Dependancy(obj.name, ref.name, "UDTT")
+            database.dependencies.append(dep)
 
         connection.close()
         return database
 
     def calculate_sp_dependencies(self, database: Database) -> List[StoredProcedure]:
-        dependencies = {d.obj: [] for d in database.dependancies}
-        for item in database.dependancies:
+        dependencies = {d.obj: [] for d in database.dependencies}
+        for item in database.dependencies:
             dependencies[item.obj].append(item.referenced_obj)
 
         graph = dict(zip(dependencies.keys(), map(set, dependencies.values())))
