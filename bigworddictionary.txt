@@ -9,6 +9,8 @@ customer,special
 exemption,serial
 human,resources
 hire,date
+print,error
+sales,reason
 driver,statusses
 page,size
 language,strings

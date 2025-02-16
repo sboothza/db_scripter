@@ -204,7 +204,7 @@ class SqliteAdaptor(Adaptor):
                             pk.fields.append(fieldname)
                         table.pk = pk
                     elif type == "FOREIGN KEY":
-                        refmatch = re.search((r"\(([^\)]+)\) REFERENCES (\w+)\W*\(([^\)]+)\)"), remainder)
+                        refmatch = re.search(r"\(([^\)]+)\) REFERENCES (\w+)\W*\(([^\)]+)\)", remainder)
                         if refmatch:
                             local_fields = refmatch.group(1).split(",")
                             remote_table = refmatch.group(2)

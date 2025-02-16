@@ -36,69 +36,6 @@ class QualifiedName:
         return hash(str(self))
 
 
-class FieldType:
-    pass
-
-
-class FieldType(Flag):
-    Undefined = auto()
-    Integer = auto()
-    String = auto()
-    Float = auto()
-    Decimal = auto()
-    Datetime = auto()
-    Boolean = auto()
-    UniqueIdentifier = auto()
-    Binary = auto()
-    Hierarchy = auto()
-
-    @classmethod
-    def get_fieldtype(cls, value: str) -> FieldType:
-        value = value.lower()
-        if value == "integer" or value == "int" or value == "bigint" or value == "tinyint":
-            return FieldType.Integer
-        elif value == "string" or value == "varchar" or value == "char" or value == "text":
-            return FieldType.String
-        elif value == "float" or value == "real":
-            return FieldType.Float
-        elif value == "datetime" or value == "date":
-            return FieldType.Datetime
-        elif value == "boolean" or value == "bool":
-            return FieldType.Boolean
-        elif value == "decimal" or value == "money":
-            return FieldType.Decimal
-        elif value == "binary":
-            return FieldType.Binary
-        elif value == "uniqueidentifier":
-            return FieldType.UniqueIdentifier
-        elif value == "none":
-            return FieldType.Undefined
-        else:
-            raise DatatypeException(f"Unknown field type {value}")
-
-    def __str__(self):
-        if self == FieldType.Integer:
-            return "Integer"
-        elif self == FieldType.String:
-            return "String"
-        elif self == FieldType.Float:
-            return "Float"
-        elif self == FieldType.Datetime:
-            return "Datetime"
-        elif self == FieldType.Boolean:
-            return "Boolean"
-        elif self == FieldType.Decimal:
-            return "Decimal"
-        elif self == FieldType.Binary:
-            return "Binary"
-        elif self == FieldType.UniqueIdentifier:
-            return "UniqueIdentifier"
-        elif self == FieldType.Undefined:
-            return "None"
-        else:
-            raise DatatypeException("Unknown field type ")
-
-
 class SchemaObject:
     name: QualifiedName
 
@@ -109,6 +46,11 @@ class SchemaObject:
         return str(self.name)
 
 
+class FieldType(SchemaObject):
+    def __init__(self, name: QualifiedName = None):
+        super().__init__(name)
+
+
 class UDDT(SchemaObject):
     name: QualifiedName
     generic_type: FieldType
@@ -117,7 +59,7 @@ class UDDT(SchemaObject):
     required: bool
     native_type: str
 
-    def __init__(self, name: QualifiedName = None, generic_type: FieldType = FieldType.Undefined, size: int = 0,
+    def __init__(self, name: QualifiedName = None, generic_type: FieldType = None, size: int = 0,
                  scale: int = 0, required: bool = False, native_type: str = None):
         super().__init__(name)
         self.generic_type = generic_type
@@ -131,7 +73,6 @@ class UDDT(SchemaObject):
 
 
 class Field(SchemaObject):
-    name: Name
     generic_type: FieldType
     size: int
     scale: int
@@ -140,10 +81,11 @@ class Field(SchemaObject):
     required: bool
     native_type: str
 
-    def __init__(self, name: Name = None, generic_type: FieldType  = FieldType.Undefined, size: int = 0,
+    def __init__(self, name: QualifiedName = None, generic_type: FieldType = None,
+                 size: int = 0,
                  scale: int = 0, auto_increment: bool = False, default=None, required: bool = False,
                  native_type: str = None):
-        self.name = name
+        super().__init__(name)
         self.generic_type = generic_type
         self.size = size
         self.scale = scale
@@ -204,20 +146,18 @@ class KeyType(Enum):
             raise DatatypeException("Unknown key type ")
 
 
-class Key(object):
-    name: QualifiedName
+class Key(SchemaObject):
     fields: List[str]
     primary_table: QualifiedName
     primary_fields: List[str]
     referenced_table: QualifiedName
     key_type: KeyType
 
-    def __init__(self, name: QualifiedName = None, key_type: KeyType = KeyType.Undefined, fields: list[str] = [],
-                 primary_table: QualifiedName = None, primary_fields: list[str] = []):
-        self.name = name
-        self.fields: List[str] = fields
-        self.primary_table = primary_table
-        self.primary_fields: List[str] = primary_fields
+    def __init__(self, name: QualifiedName = None, key_type: KeyType = KeyType.Undefined):
+        super().__init__(name)
+        self.fields: List[str] = []
+        self.primary_table = None
+        self.primary_fields: List[str] = []
         self.key_type = key_type
         self.referenced_table = None
 
@@ -227,7 +167,7 @@ class Key(object):
 
 
 class AscendingOrDescendingType:
-    pass
+    ...
 
 
 class AscendingOrDescendingType(Enum):
@@ -271,13 +211,12 @@ class Dependancy:
         return str(self.obj)
 
 
-class Constraint:
-    name: QualifiedName
+class Constraint(SchemaObject):
     table_name: QualifiedName
     definition: str
 
     def __init__(self, name: QualifiedName = None, table_name: QualifiedName = None, definition: str = ""):
-        self.name = name
+        super().__init__(name)
         self.table_name = table_name
         self.definition = definition
 
@@ -324,12 +263,12 @@ class UDTT(SchemaObject):
     name: QualifiedName
     fields: list[Field]
 
-    def __init__(self, name: QualifiedName = None, fields: list[Field] = []):
+    def __init__(self, name: QualifiedName = None, fields: list[Field] = None):
         super().__init__(name)
-        self.fields: list[Field] = fields
+        self.fields: list[Field] = (fields if fields is not None else [])
 
     def find_field(self, name: str) -> Field:
-        found_fields = [f for f in self.fields if f.name.lower() == name.lower()]
+        found_fields = [f for f in self.fields if str(f.name).lower() == name.lower()]
         if len(found_fields) > 0:
             return found_fields[0]
         else:
