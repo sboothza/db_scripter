@@ -8,7 +8,7 @@ class Adaptor(object):
         self.connection = connection
         self.naming = naming
 
-    def import_schema(self, db_name: str) -> Database:
+    def import_schema(self, db_name: str = None, options: {} = None) -> Database:
         ...
 
     def write_schema(self, database: Database, path: str):

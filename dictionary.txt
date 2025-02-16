@@ -10,6 +10,9 @@ leave
 dbo
 production
 culture
+adventure
+style
+works
 database
 human
 component
