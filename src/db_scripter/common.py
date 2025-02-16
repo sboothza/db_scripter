@@ -1,4 +1,5 @@
 import os.path
+import shutil
 from pathlib import Path
 
 
@@ -6,7 +7,7 @@ def create_dir(path: str, delete:bool=False):
     if not os.path.exists(path) or not delete:
         os.mkdir(path)
     else:
-        os.rmdir(path)
+        shutil.rmtree(path)
         os.mkdir(path)
 
 

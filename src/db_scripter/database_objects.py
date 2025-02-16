@@ -1,7 +1,7 @@
 from enum import Enum, auto, Flag
 from typing import List
 
-from sb_serializer import Name
+from sb_serializer import Name, Naming
 
 
 class DataException(Exception):
@@ -13,15 +13,27 @@ class DatatypeException(DataException):
 
 
 class QualifiedName:
-    schema: str
-    name: str
+    schema: Name
+    name: Name
 
-    def __init__(self, schema: str = None, name: str = None):
+    def __init__(self, schema: Name = None, name: Name = None):
         self.schema = schema
         self.name = name
 
     def __str__(self):
-        return f"{self.schema}.{self.name}"
+        return f"{self.schema.pascal()}.{self.name.pascal()}"
+
+    def __gt__(self, other):
+        return str(self) > str(other)
+
+    def __lt__(self, other):
+        return str(self) < str(other)
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+    def __hash__(self):
+        return hash(str(self))
 
 
 class FieldType:
@@ -93,6 +105,9 @@ class SchemaObject:
     def __init__(self, name: QualifiedName = None):
         self.name = name
 
+    def __str__(self):
+        return str(self.name)
+
 
 class UDDT(SchemaObject):
     name: QualifiedName
@@ -112,12 +127,12 @@ class UDDT(SchemaObject):
         self.native_type = native_type
 
     def __str__(self):
-        return self.name
+        return str(self.name)
 
 
-class Field(object):
+class Field(SchemaObject):
     name: Name
-    generic_type: FieldType | str
+    generic_type: FieldType
     size: int
     scale: int
     auto_increment: bool
@@ -125,7 +140,7 @@ class Field(object):
     required: bool
     native_type: str
 
-    def __init__(self, name: Name = None, generic_type: FieldType | str = FieldType.Undefined, size: int = 0,
+    def __init__(self, name: Name = None, generic_type: FieldType  = FieldType.Undefined, size: int = 0,
                  scale: int = 0, auto_increment: bool = False, default=None, required: bool = False,
                  native_type: str = None):
         self.name = name
@@ -190,21 +205,21 @@ class KeyType(Enum):
 
 
 class Key(object):
-    name: Name
+    name: QualifiedName
     fields: List[str]
-    primary_table: str
+    primary_table: QualifiedName
     primary_fields: List[str]
-    referenced_table: str
+    referenced_table: QualifiedName
     key_type: KeyType
 
-    def __init__(self, name: Name = None, key_type: KeyType = KeyType.Undefined, fields: list[str] = [],
-                 primary_table: str = "", primary_fields: list[str] = []):
+    def __init__(self, name: QualifiedName = None, key_type: KeyType = KeyType.Undefined, fields: list[str] = [],
+                 primary_table: QualifiedName = None, primary_fields: list[str] = []):
         self.name = name
         self.fields: List[str] = fields
         self.primary_table = primary_table
         self.primary_fields: List[str] = primary_fields
         self.key_type = key_type
-        self.referenced_table = ""
+        self.referenced_table = None
 
     def __str__(self):
         return f"{self.name} {self.key_type} {','.join(self.fields)}{self.primary_table}" \
@@ -252,12 +267,30 @@ class Dependancy:
         self.referenced_obj = referenced_obj
         self.obj_type = obj_type
 
+    def __str__(self):
+        return str(self.obj)
+
+
+class Constraint:
+    name: QualifiedName
+    table_name: QualifiedName
+    definition: str
+
+    def __init__(self, name: QualifiedName = None, table_name: QualifiedName = None, definition: str = ""):
+        self.name = name
+        self.table_name = table_name
+        self.definition = definition
+
+    def __str__(self):
+        return str(self.name)
+
 
 class Table(SchemaObject):
     fields: list[Field]
     pk: Key
     keys: list[Key]
     foreign_keys: list[Key]
+    constraints: list[Constraint]
 
     def __init__(self, name: QualifiedName = None):
         super().__init__(name)
@@ -265,6 +298,7 @@ class Table(SchemaObject):
         self.pk: Key | None = None
         self.keys: list[Key] = []
         self.foreign_keys: list[Key] = []
+        self.constraints: list[Constraint] = []
 
     def find_field(self, name: str) -> Field:
         found_fields = [f for f in self.fields if f.name == name.lower()]
@@ -272,9 +306,6 @@ class Table(SchemaObject):
             return found_fields[0]
         else:
             raise DataException("Could not find field")
-
-    def __str__(self):
-        return str(self.name)
 
 
 class View(Table):
@@ -303,9 +334,6 @@ class UDTT(SchemaObject):
             return found_fields[0]
         else:
             raise DataException("Could not find field")
-
-    def __str__(self):
-        return str(self.name)
 
 
 class FunctionType:
@@ -361,7 +389,7 @@ class Database(object):
         elif type == "StoredProcedure":
             return self.get_stored_procedure(name)
         elif type == "UDDT":
-            return self.get_type(name.name)
+            return self.get_type(name.name.raw())
         elif type == "UDTT":
             return self.get_table_type(name)
         elif type == "Function":

@@ -1,10 +1,14 @@
 invoice,date
+thumb,nail
+bill,of,materials
 account,status
 account,statuses
 customer,status
 customer,statuses
 customer,special
 exemption,serial
+human,resources
+hire,date
 driver,statusses
 page,size
 language,strings

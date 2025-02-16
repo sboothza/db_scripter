@@ -6,7 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="5f1eabdb-579d-4cab-b10a-e0cd6ca35278" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/readme.txt" beforeDir="false" afterPath="$PROJECT_DIR$/readme.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/db_scripter/common.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/common.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/database_objects.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/database_objects.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/db_scripter/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -40,7 +43,7 @@
     "Python tests.Python tests for test_dependency.TestDependency.test_many_dependencies.executor": "Run",
     "Python tests.Python tests for test_dependency.TestDependency.test_no_dependencies.executor": "Debug",
     "Python tests.Python tests for test_dependency.TestDependency.test_one_dependency.executor": "Debug",
-    "Python.main.executor": "Run",
+    "Python.main.executor": "Debug",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "master",
@@ -178,10 +181,6 @@
           <option name="timeStamp" value="31" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/db_scripter/database_objects.py</url>
-          <option name="timeStamp" value="32" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/tests/test_dependency.py</url>
           <line>47</line>
           <option name="timeStamp" value="33" />
@@ -195,6 +194,16 @@
           <url>file://$PROJECT_DIR$/tests/test_dependency.py</url>
           <line>24</line>
           <option name="timeStamp" value="37" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
+          <line>200</line>
+          <option name="timeStamp" value="38" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/db_scripter/mssql_adaptor.py</url>
+          <line>268</line>
+          <option name="timeStamp" value="39" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
