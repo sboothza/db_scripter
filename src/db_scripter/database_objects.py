@@ -1,18 +1,21 @@
-from enum import Enum, auto, Flag
+from enum import Enum, auto
 from typing import List
 
 from sb_serializer import Name, Naming
 
 
 class DataException(Exception):
-    pass
+    ...
 
 
 class DatatypeException(DataException):
-    pass
+    ...
 
 
 class QualifiedName:
+    """
+    QualifiedName - schema + name
+    """
     schema: Name
     name: Name
 
@@ -37,6 +40,10 @@ class QualifiedName:
 
 
 class SchemaObject:
+    """
+    Base class for schema entities - tables, views, sp, everything
+    Stores a name (schema + name)
+    """
     name: QualifiedName
 
     def __init__(self, name: QualifiedName = None):
@@ -46,21 +53,23 @@ class SchemaObject:
         return str(self.name)
 
 
-class FieldType(SchemaObject):
-    def __init__(self, name: QualifiedName = None):
-        super().__init__(name)
+# class FieldType(SchemaObject):
+#     def __init__(self, name: QualifiedName = None):
+#         super().__init__(name)
 
 
 class UDDT(SchemaObject):
-    name: QualifiedName
-    generic_type: FieldType
+    """
+    User defined data type
+    """
+    generic_type: str
     size: int
     scale: int
     required: bool
-    native_type: str
+    native_type: QualifiedName
 
-    def __init__(self, name: QualifiedName = None, generic_type: FieldType = None, size: int = 0,
-                 scale: int = 0, required: bool = False, native_type: str = None):
+    def __init__(self, name: QualifiedName = None, generic_type: str = None, size: int = 0,
+                 scale: int = 0, required: bool = False, native_type: QualifiedName = None):
         super().__init__(name)
         self.generic_type = generic_type
         self.size = size
@@ -73,18 +82,29 @@ class UDDT(SchemaObject):
 
 
 class Field(SchemaObject):
-    generic_type: FieldType
+    """
+    Field or column of a table or view
+    """
+
+    generic_type: str
+    """
+        generic_type - db agnostic field type
+    """
+
+    native_type: QualifiedName
+    """
+        native_type - native db type as imported
+    """
     size: int
     scale: int
     auto_increment: bool
     default: str
     required: bool
-    native_type: str
 
-    def __init__(self, name: QualifiedName = None, generic_type: FieldType = None,
+    def __init__(self, name: QualifiedName = None, generic_type: str = None,
                  size: int = 0,
                  scale: int = 0, auto_increment: bool = False, default=None, required: bool = False,
-                 native_type: str = None):
+                 native_type: QualifiedName = None):
         super().__init__(name)
         self.generic_type = generic_type
         self.size = size
@@ -260,7 +280,10 @@ class StoredProcedure(SchemaObject):
 
 
 class UDTT(SchemaObject):
-    name: QualifiedName
+    """
+    User defined table type
+    """
+
     fields: list[Field]
 
     def __init__(self, name: QualifiedName = None, fields: list[Field] = None):

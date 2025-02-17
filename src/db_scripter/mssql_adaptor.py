@@ -1,6 +1,5 @@
 import os.path
 import re
-from os.path import split
 from typing import List
 
 import pymssql
@@ -9,21 +8,21 @@ from sb_serializer import Name, Naming
 from toposort import toposort_flatten
 
 from adaptor import Adaptor
-from database_objects import Database, Table, KeyType, FieldType, Field, DataException, DatatypeException, View, \
+from common import create_dir
+from database_objects import Database, Table, KeyType, Field, DataException, DatatypeException, View, \
     UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName, Dependancy, Key, Constraint
-from src.db_scripter.common import create_dir
-from src.db_scripter.database_objects import Function
+from database_objects import Function
+from options import Options
 
 
 class MsSqlAdaptor(Adaptor):
     """ Connection string is mssql://user:pass@hostname/database """
     __blank_connection__ = "mssql://u:p@h/d"
-    options: dict[str, str]
+    options: Options
     naming: Naming
 
     def __init__(self, connection, naming):
         super().__init__(connection, naming)
-        self.options = {}
         self.naming = naming
 
         match = re.match(r"mssql://((\w*):(\w*)@)?([^/]+)/([^?]+)(\?.+)?", self.connection)
@@ -34,21 +33,21 @@ class MsSqlAdaptor(Adaptor):
             self.database = match.group(5)
             options = match.group(6)
             if options is not None:
-                options_match = re.findall(r"(\w+)=(\w+)", options)
-                for option_match in options_match:
-                    self.options[option_match[0]] = option_match[1]
+                self.options = Options(options)
+            else:
+                self.options = Options()
 
         else:
             raise DataException("Invalid connection string")
 
-    def get_option(self, name: str, default: str) -> str:
-        if name not in self.options.keys():
-            return default
-        return self.options[name]
+    # def get_option(self, name: str, default: str) -> str:
+    #     if name not in self.options.keys():
+    #         return default
+    #     return self.options[name]
 
     def connect(self) -> Connection:
         connection = None
-        if self.get_option("integrated_authentication", "False") == "True":
+        if self.options["integrated_authentication", "False"] == "True":
             connection = pymssql.connect(host=self.hostname, database=self.database)
         else:
             connection = pymssql.connect(user=self.user, password=self.password, host=self.hostname,
@@ -58,7 +57,7 @@ class MsSqlAdaptor(Adaptor):
         cursor.execute("select GETDATE() as d;")
         return connection
 
-    def import_schema(self, db_name: str = None, options: {} = None) -> Database:
+    def import_schema(self, db_name: str = None, options: Options = None) -> Database:
         connection = self.connect()
 
         if db_name is None:
@@ -67,7 +66,7 @@ class MsSqlAdaptor(Adaptor):
         database = Database(Name(db_name))
         cursor = connection.cursor(as_dict=True)
 
-        if options.get("exclude-udts"):
+        if options["exclude-udts"]:
             print("Skipping uddts...")
         else:
             print("Processing uddts...")
@@ -89,7 +88,7 @@ class MsSqlAdaptor(Adaptor):
                                              row["scale"], None)
                 database.uddts.append(udt)
 
-        if options.get("exclude-tables"):
+        if options["exclude-tables"]:
             print("Skipping tables...")
         else:
             print("Processing tables...")
@@ -101,7 +100,7 @@ class MsSqlAdaptor(Adaptor):
                 "inner join sys.columns as col on tab.object_id = col.object_id "
                 "left join sys.types as t on col.user_type_id = t.user_type_id "
                 "left join sys.default_constraints d on d.object_id = col.default_object_id "
-                "order by tab.name, column_id;")
+                "order by tab.schema_id, tab.name, column_id;")
             table_name = "none"
             table = None
             for row in cursor.fetchall():
@@ -115,14 +114,14 @@ class MsSqlAdaptor(Adaptor):
 
                 field = Field(QualifiedName(self.naming.string_to_name(row["schema_name"]),
                                             self.naming.string_to_name(row["name"])),
-                                            auto_increment=row["IS_IDENTITY"] == 1,
-                                            required=row["is_nullable"], native_type=row["data_type"])
+                              auto_increment=row["IS_IDENTITY"] == 1,
+                              required=row["is_nullable"], native_type=row["data_type"])
                 self.get_field_type_defaults(database, row["data_type"], field, row["max_length"], row["precision"],
                                              row["precision"], row["default_value"])
 
                 table.fields.append(field)
 
-        if options.get("exclude-views"):
+        if options["exclude-views"]:
             print("Skipping views...")
         else:
             print("Processing views...")
@@ -161,7 +160,7 @@ class MsSqlAdaptor(Adaptor):
 
                 view.fields.append(field)
 
-        if options.get("exclude-udts"):
+        if options["exclude-udts"]:
             print("Skipping udtts...")
         else:
             print("Processing udtts...")
@@ -190,20 +189,20 @@ class MsSqlAdaptor(Adaptor):
                 database.udtts.append(udtt)
 
                 field = Field(QualifiedName(
-                    self.naming.string_to_name(row["schema_name"], self.naming.string_to_name(row["Column"]))),
-                              required=row["Nullable"] == 0,
-                              native_type=row["data_type"])
+                    self.naming.string_to_name(row["schema_name"]), self.naming.string_to_name(row["Column"])),
+                    required=row["Nullable"] == 0,
+                    native_type=row["Data Type"])
                 # is uddt?
                 t = database.get_type(row["Data Type"])
                 if t is not None:
-                    field.generic_type = FieldType(t.name)
+                    field.generic_type = t.name.name.raw()
                 else:
                     self.get_field_type_defaults(database, row["Data Type"], field, row["Length"], row["Precision"],
                                                  row["Scale"], None)
 
                 udtt.fields.append(field)
 
-        if options.get("exclude-functions"):
+        if options["exclude-functions"]:
             print("Skipping functions...")
         else:
             print("Processing functions...")
@@ -226,7 +225,7 @@ class MsSqlAdaptor(Adaptor):
                              FunctionType.from_str(row["type"]))
                 database.functions.append(f)
 
-        if options.get("exclude-storedprocedures"):
+        if options["exclude-storedprocedures"]:
             print("Skipping stored procedures...")
         else:
             print("Processing stored procedures...")
@@ -239,7 +238,7 @@ class MsSqlAdaptor(Adaptor):
                                                    self.naming.string_to_name(row["name"])), row["text"])
                 database.stored_procedures.append(sp)
 
-        if options.get("exclude-foreignkeys"):
+        if options["exclude-foreignkeys"]:
             print("Skipping foreign keys...")
         else:
             print("Processing foreign keys...")
@@ -276,7 +275,7 @@ class MsSqlAdaptor(Adaptor):
                 fk.primary_fields.append(row["column"])
                 fk.fields.append(row["referenced_column"])
 
-        if options.get("exclude-constraints"):
+        if options["exclude-constraints"]:
             print("Skipping constraints...")
         else:
             print("Processing constraints...")
@@ -298,7 +297,7 @@ class MsSqlAdaptor(Adaptor):
                                                self.naming.string_to_name(row["table_name"])), row["definition"])
                 table.constraints.append(con)
 
-        if options.get("exclude-primarykeys"):
+        if options["exclude-primarykeys"]:
             print("Skipping primary keys...")
         else:
             print("Processing primary keys...")
@@ -327,7 +326,7 @@ class MsSqlAdaptor(Adaptor):
 
                 pk.fields.append(row["PRIMARYKEYCOLUMN"])
 
-        if options.get("exclude-dependencies"):
+        if options["exclude-dependencies"]:
             print("Skipping dependencies...")
         else:
             print("Processing dependencies...")
@@ -464,7 +463,7 @@ class MsSqlAdaptor(Adaptor):
         local_path = os.path.join(path, "udt")
         create_dir(local_path)
         for udt in database.uddts:
-            with open(os.path.join(local_path, udt.name.name + ".sql"), "w", 1024, encoding="utf8") as f:
+            with open(os.path.join(local_path, udt.name.name.raw() + ".sql"), "w", 1024, encoding="utf8") as f:
                 f.write(self.generate_create_uddt_script(udt))
                 f.flush()
 
@@ -472,7 +471,7 @@ class MsSqlAdaptor(Adaptor):
         local_path = os.path.join(path, "udtt")
         create_dir(local_path)
         for udt in database.udtts:
-            with open(os.path.join(local_path, udt.name.name + ".sql"), "w", 1024, encoding="utf8") as f:
+            with open(os.path.join(local_path, udt.name.name.raw() + ".sql"), "w", 1024, encoding="utf8") as f:
                 f.write(self.generate_create_udtt_script(udt))
                 f.flush()
 
@@ -506,15 +505,15 @@ class MsSqlAdaptor(Adaptor):
 
     @staticmethod
     def get_field_size(field: Field | UDDT) -> str:
-        if field.generic_type == FieldType.String:
+        if field.generic_type == "string":
             return f"({field.size})"
-        elif field.generic_type == FieldType.Decimal:
+        elif field.generic_type == "decimal":
             return f"({field.size},{field.scale})"
         return ""
 
     @staticmethod
     def get_field_default(field: Field) -> str:
-        if field.generic_type == FieldType.String or field.generic_type == FieldType.Datetime:
+        if field.generic_type == "string" or field.generic_type == "datetime":
             return f"'{field.default}'"
         return field.default
 
@@ -574,68 +573,68 @@ class MsSqlAdaptor(Adaptor):
 
         default = None if default is None else str(default)
         if value == "integer" or value == "int":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 4
         elif value == "bigint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 8
         elif value == "tinyint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 1
         elif value == "smallint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 2
         elif value == "mediumint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 3
         elif value == "float" or value == "real":
-            field.generic_type = FieldType.Float
+            field.generic_type = "float"
             field.size = 4
         elif value == "double":
-            field.generic_type = FieldType.Float
+            field.generic_type = "float"
             field.size = 8
         elif value == "boolean" or value == "bool" or value == "bit":
-            field.generic_type = FieldType.Boolean
+            field.generic_type = "boolean"
             field.size = 1
         elif value == "decimal" or value == "money" or value == "numeric" or value == "smallmoney":
-            field.generic_type = FieldType.Decimal
+            field.generic_type = "decimal"
             field.size = precision
             field.scale = scale
         elif value == "string" or value == "varchar" or value == "nvarchar" or value == "char" or value == "nchar":
-            field.generic_type = FieldType.String
+            field.generic_type = "string"
             field.size = size
         elif value == "varbinary" or value == "text" or value == "xml":
-            field.generic_type = FieldType.Binary
+            field.generic_type = "binary"
             field.size = size
         elif value == "datetime" or value == "date" or value == "datetime2" or value == "smalldatetime" or value == "timestamp" or value == "time":
-            field.generic_type = FieldType.Datetime
+            field.generic_type = "datetime"
             field.size = 0
         elif value == "none" or value == "undefined":
-            field.generic_type = FieldType.Undefined
+            field.generic_type = "undefined"
             field.size = 0
         elif value == "uniqueidentifier":
-            field.generic_type = FieldType.UniqueIdentifier
+            field.generic_type = "uniqueidentifier"
             field.size = 0
         elif value == "sysname":
-            field.generic_type = FieldType.String
+            field.generic_type = "string"
             field.size = 128
         elif value == "hierarchyid":
-            field.generic_type = FieldType.Hierarchy
+            field.generic_type = "hierarchy"
             field.size = 1
         else:
             uddt = database.get_type(value)
             if uddt is None:
                 raise DatatypeException("Unknown field type {}".format(value))
             else:
-                field.generic_type = FieldType(uddt.name)
+                field.generic_type = uddt.generic_type
 
         field.default = default
 
     def get_field_type(self, field: Field | UDDT) -> str:
         if field.native_type is not None:
-            return field.native_type
+            return field.native_type.name.raw()
 
-        if field.generic_type == FieldType.Integer:
+        if field.generic_type == "integer":
             if field.size == 1:
                 return "TINYINT"
             elif field.size == 2:
@@ -648,9 +647,9 @@ class MsSqlAdaptor(Adaptor):
                 return "BIGINT"
             else:
                 raise DatatypeException("Unknown field size")
-        elif field.generic_type == FieldType.String:
+        elif field.generic_type == "string":
             return "VARCHAR"
-        elif field.generic_type == FieldType.Float:
+        elif field.generic_type == "float":
             if field.size == 4:
                 return "FLOAT"
             elif field.size == 8:
@@ -658,13 +657,13 @@ class MsSqlAdaptor(Adaptor):
             else:
                 raise DatatypeException("Unknown float size")
 
-        elif field.generic_type == FieldType.Decimal:
+        elif field.generic_type == "decimal":
             return "DECIMAL"
-        elif field.generic_type == FieldType.Datetime:
+        elif field.generic_type == "datetime":
             return "DATETIME"
-        elif field.generic_type == FieldType.Boolean:
+        elif field.generic_type == "boolean":
             return "TINYINT"
-        elif field.generic_type == FieldType.UniqueIdentifier:
+        elif field.generic_type == "uniqueidentifier":
             return "UNIQUEIDENTIFIER"
         else:
             raise DatatypeException("Unknown field type ")

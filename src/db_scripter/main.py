@@ -1,11 +1,10 @@
 import argparse
-import os
 
-import sb_serializer
 from sb_serializer import Naming, HardSerializer
 
 from adaptor_factory import AdaptorFactory
 from database_objects import Database
+from src.db_scripter.options import Options
 
 
 def main():
@@ -45,25 +44,25 @@ def main():
     adaptor = AdaptorFactory.get_adaptor_for_connection_string(args.connection_string, naming)
     # adaptor = AdaptorFactory.get_adaptor_for_connection_string("mssql://DV4-POLSQLAG-01/Polly_C?integrated_authentication=True", naming)
 
-    options = {}
+    options = Options()
     if "tables" in args.exclude:
-        options["exclude-tables"] = True
+        options["exclude-tables"] = "True"
     if "views" in args.exclude:
-        options["exclude-views"] = True
+        options["exclude-views"] = "True"
     if "functions" in args.exclude:
-        options["exclude-functions"] = True
+        options["exclude-functions"] = "True"
     if "udts" in args.exclude:
-        options["exclude-udts"] = True
+        options["exclude-udts"] = "True"
     if "storedprocedures" in args.exclude:
-        options["exclude-storedprocedures"] = True
+        options["exclude-storedprocedures"] = "True"
     if "foreignkeys" in args.exclude:
-        options["exclude-foreignkeys"] = True
+        options["exclude-foreignkeys"] = "True"
     if "constraints" in args.exclude:
-        options["exclude-constraints"] = True
+        options["exclude-constraints"] = "True"
     if "primarykeys" in args.exclude:
-        options["exclude-primarykeys"] = True
+        options["exclude-primarykeys"] = "True"
     if "dependencies" in args.exclude:
-        options["exclude-dependencies"] = True
+        options["exclude-dependencies"] = "True"
 
     if args.operation == "import-schema":
         db = adaptor.import_schema(options=options)
