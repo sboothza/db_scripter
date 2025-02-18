@@ -330,20 +330,24 @@ class Function(SchemaObject):
 class Database(object):
     name: Name
     tables: List[Table]
+    views: List[View]
     stored_procedures: List[StoredProcedure]
     functions: List[Function]
     uddts: List[UDDT]
     udtts: List[UDTT]
     dependancies: List[Dependancy]
+    imported_db_type:str
 
     def __init__(self, name: Name = None):
         self.name = name
         self.tables: List[Table] = []
+        self.views: List[View] = []
         self.stored_procedures: List[StoredProcedure] = []
         self.functions: List[Function] = []
         self.uddts: List[UDDT] = []
         self.udtts: List[UDTT] = []
         self.dependancies: List[Dependancy] = []
+        self.imported_db_type = ""
 
     def get_object(self, name: QualifiedName, type: str) -> SchemaObject | None:
         if type == "Table" or type == "View":

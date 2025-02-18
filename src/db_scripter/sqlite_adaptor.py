@@ -1,10 +1,12 @@
+import os
 import re
 import sqlite3
 from typing import Union, List
 
-from database_objects import Database, Table, KeyType, FieldType, Key, Field, DatatypeException, DataException
+from database_objects import Database, Table, KeyType, Key, Field, DatatypeException, DataException, UDDT
 from adaptor import Adaptor
-from common import get_fullname, get_filename, clean_string, find_in_list
+from common import get_fullname, get_filename, clean_string, find_in_list, create_dir
+from src.db_scripter.database_objects import QualifiedName
 
 
 class SqliteAdaptor(Adaptor):
@@ -18,7 +20,7 @@ class SqliteAdaptor(Adaptor):
         else:
             self.connection = get_fullname(connection_string)
 
-    def import_schema(self, db_name: str) -> Database:
+    def import_schema(self, db_name: str = None, options: {} = None) -> Database:
         connection = sqlite3.connect(self.connection)
         if db_name is None:
             db_name = get_filename(self.connection)
@@ -36,13 +38,27 @@ class SqliteAdaptor(Adaptor):
 
         return database
 
+    def write_schema(self, database: Database, path: str):
+        # write tables
+        print("Writing table scripts....")
+        local_path = os.path.join(path, "tables")
+
+        create_dir(local_path, delete=True)
+
+        counter = 1
+        for table in database.tables:
+            with open(os.path.join(local_path, f"{counter:03}-{table.name.name}.sql"), "w", 1024, encoding="utf8") as f:
+                f.write(self.generate_create_script(table, database.imported_db_type))
+                f.flush()
+            counter += 1
+
     def escape_field_list(self, values: List[str]) -> List[str]:
         return ["\"" + value + "\"" for value in values]
 
-    def generate_create_script(self, table: Table) -> str:
+    def generate_create_script(self, table: Table, original_db_type: str) -> str:
         sql: list[str] = []
         for field in table.fields:
-            sql.append(f"\"{field.name.raw()}\" {self.get_field_type(field.generic_type)} ")
+            sql.append(f"\"{field.name}\" {self.get_field_type(field, original_db_type)} ")
         if table.pk:
             sql.append(f"PRIMARY KEY ({','.join(self.escape_field_list(table.pk.fields))})")
 
@@ -51,91 +67,94 @@ class SqliteAdaptor(Adaptor):
                        f"\"{fk.primary_table}\"({','.join(self.escape_field_list(fk.primary_fields))})")
 
         joiner = ',\n\t'
-        result = f"create table \"{table.name.raw()}\" (\n\t{joiner.join(sql)}\n);\n"
+        result = f"create table \"{table.name}\" (\n\t{joiner.join(sql)}\n);\n"
 
         for key in table.keys:
             if key.key_type == KeyType.Unique:
-                result += f" CREATE UNIQUE INDEX \"{key.name.raw()}\" ON \"{table.name.raw()}\" " \
+                result += f" CREATE UNIQUE INDEX \"{key.name}\" ON \"{table.name}\" " \
                           f"({','.join(self.escape_field_list(key.fields))});\n"
 
             elif key.key_type == KeyType.Index:
-                result += f" CREATE INDEX \"{key.name.raw()}\" ON \"{table.name.raw()}\" " \
+                result += f" CREATE INDEX \"{key.name}\" ON \"{table.name}\" " \
                           f"({','.join(self.escape_field_list(key.fields))});\n"
 
         return result
 
-    def generate_table_exists_script(self, table: Table, db_name: str) -> str:
-        return f"SELECT name FROM sqlite_schema WHERE type='table' and name = '{table.name.raw()}'"
+    # def generate_table_exists_script(self, table: Table, db_name: str) -> str:
+    #     return f"SELECT name FROM sqlite_schema WHERE type='table' and name = '{table.name}'"
+    #
+    # def generate_drop_script(self, table: Table) -> str:
+    #     return f"drop table {table.name};"
+    #
+    # def generate_count_script(self, table: Table) -> str:
+    #     return f"select count(*) from {table.name}"
+    #
+    # def generate_insert_script(self, table: Table) -> str:
+    #     fields = [f.name for f in table.fields if not f.auto_increment]
+    #     params = ", ".join([f"{f}" for f in fields])
+    #     values = ", ".join([f":{f.name}" for f in fields])
+    #     result = f"insert into {table.name} ({params}) values ({values});"
+    #     return result
+    #
+    # def generate_update_script(self, table: Table) -> str:
+    #     fields = [f.name for f in table.fields if not f.auto_increment and f.name not in table.pk.fields]
+    #     update_list = [f"{f} = :{f}" for f in fields]
+    #     update = ", ".join(update_list)
+    #     key_list = [f"{f} = :{f}" for f in table.pk.fields]
+    #     key = " and ".join(key_list)
+    #     result = f"update {table.name} set {update} where {key};"
+    #     return result
+    #
+    # def generate_delete_script(self, table: Table) -> str:
+    #     key_list = [f"{f} = :{f}" for f in table.pk.fields]
+    #     key = " and ".join(key_list)
+    #     result = f"delete from {table.name} where {key};"
+    #     return result
+    #
+    # def generate_fetch_by_id_script(self, table: Table) -> str:
+    #     field_list = [f.name for f in table.fields]
+    #     fields = ", ".join([f"{f}" for f in field_list])
+    #     key_list = [f"{f} = :{f}" for f in table.pk.fields]
+    #     key = " and ".join(key_list)
+    #     result = f"select {fields} from {table.name} where {key};"
+    #     return result
+    #
+    # def generate_item_exists_script(self, table: Table) -> str:
+    #     key_list = [f"{f} = :{f}" for f in table.pk.fields]
+    #     key = " and ".join(key_list)
+    #     result = f"select count(*) from {table.name} where {key};"
+    #     return result
 
-    def generate_drop_script(self, table: Table) -> str:
-        return f"drop table {table.name.raw()};"
+    def get_field_type(self, field: Field | UDDT, original_db_type: str) -> str:
+        if original_db_type == "sqlite" and field.native_type is not None:
+            return field.native_type.name.raw()
 
-    def generate_count_script(self, table: Table) -> str:
-        return f"select count(*) from {table.name.raw()}"
-
-    def generate_insert_script(self, table: Table) -> str:
-        fields = [f.name.raw() for f in table.fields if not f.auto_increment]
-        params = ", ".join([f"{f}" for f in fields])
-        values = ", ".join([":" + f for f in fields])
-        result = f"insert into {table.name.raw()} ({params}) values ({values});"
-        return result
-
-    def generate_update_script(self, table: Table) -> str:
-        fields = [f.name.raw() for f in table.fields if not f.auto_increment and f.name not in table.pk.fields]
-        update_list = [f"{f} = :{f}" for f in fields]
-        update = ", ".join(update_list)
-        key_list = [f"{f} = :{f}" for f in table.pk.fields]
-        key = " and ".join(key_list)
-        result = f"update {table.name.raw()} set {update} where {key};"
-        return result
-
-    def generate_delete_script(self, table: Table) -> str:
-        key_list = [f"{f} = :{f}" for f in table.pk.fields]
-        key = " and ".join(key_list)
-        result = f"delete from {table.name.raw()} where {key};"
-        return result
-
-    def generate_fetch_by_id_script(self, table: Table) -> str:
-        field_list = [f.name.raw() for f in table.fields]
-        fields = ", ".join([f"{f}" for f in field_list])
-        key_list = [f"{f} = :{f}" for f in table.pk.fields]
-        key = " and ".join(key_list)
-        result = f"select {fields} from {table.name.raw()} where {key};"
-        return result
-
-    def generate_item_exists_script(self, table: Table) -> str:
-        key_list = [f"{f} = :{f}" for f in table.pk.fields]
-        key = " and ".join(key_list)
-        result = f"select count(*) from {table.name.raw()} where {key};"
-        return result
-
-    def get_field_type(self, field_type: FieldType) -> str:
-        if field_type == FieldType.Integer:
+        if field.generic_type == "integer":
             return "INTEGER"
-        elif field_type == FieldType.String:
+        elif field.generic_type == "string":
             return "TEXT"
-        elif field_type == FieldType.Float or field_type == FieldType.Decimal:
+        elif field.generic_type == "float" or field.generic_type == "decimal":
             return "REAL"
-        elif field_type == FieldType.Datetime:
+        elif field.generic_type == "datetime":
             return "REAL"
-        elif field_type == FieldType.Boolean:
+        elif field.generic_type == "boolean":
             return "INTEGER"
         else:
             raise DatatypeException("Unknown field type ")
 
-    def must_remap_field(self, field_type: FieldType) -> tuple[bool, FieldType]:
-        if field_type == FieldType.Integer:
-            return False, FieldType.Integer
-        elif field_type == FieldType.String:
-            return False, FieldType.String
-        elif field_type == FieldType.Float or field_type == FieldType.Decimal:
-            return False, FieldType.Float
-        elif field_type == FieldType.Datetime:
-            return True, FieldType.Float
-        elif field_type == FieldType.Boolean:
-            return True, FieldType.Integer
-        else:
-            raise DatatypeException("Unknown field type ")
+    # def must_remap_field(self, field_type: FieldType) -> tuple[bool, FieldType]:
+    #     if field_type == FieldType.Integer:
+    #         return False, FieldType.Integer
+    #     elif field_type == FieldType.String:
+    #         return False, FieldType.String
+    #     elif field_type == FieldType.Float or field_type == FieldType.Decimal:
+    #         return False, FieldType.Float
+    #     elif field_type == FieldType.Datetime:
+    #         return True, FieldType.Float
+    #     elif field_type == FieldType.Boolean:
+    #         return True, FieldType.Integer
+    #     else:
+    #         raise DatatypeException("Unknown field type ")
 
     def parse_create_script(self, create_script: str) -> Union[Table, None]:
         table: Table
@@ -154,7 +173,7 @@ class SqliteAdaptor(Adaptor):
                     if table_name == "sqlite_sequence":
                         return None
 
-                    table = Table(self.naming.string_to_name(table_name))
+                    table = Table(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(table_name)))
                 else:
                     raise DataException("create table issue")
 
@@ -164,7 +183,9 @@ class SqliteAdaptor(Adaptor):
                 match = re.search(r"PRIMARY KEY \((.*)\),?", line)
                 if match:
                     fields = match.group(1).split(",")
-                    pk = Key(self.naming.string_to_name(f"pk_{table_name}"), key_type=KeyType.PrimaryKey)
+                    pk = Key(
+                        QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(f"pk_{table_name}")),
+                        key_type=KeyType.PrimaryKey)
                     for fieldname in fields:
                         pk_field = table.find_field(fieldname)
                         if pk_field is None:
@@ -177,7 +198,9 @@ class SqliteAdaptor(Adaptor):
                 match = re.search(r"UNIQUE \((.*)\),?", line)
                 if match:
                     fields = match.group(1).split(",")
-                    ux = Key(self.naming.string_to_name(f"ux_{table_name}_{ux_count}"), key_type=KeyType.Unique)
+                    ux = Key(QualifiedName(self.naming.string_to_name(""),
+                                           self.naming.string_to_name(f"ux_{table_name}_{ux_count}")),
+                             key_type=KeyType.Unique)
                     ux_count = ux_count + 1
                     for fieldname in fields:
                         ux_field = table.find_field(fieldname)
@@ -196,7 +219,7 @@ class SqliteAdaptor(Adaptor):
                     if type == "PRIMARY KEY":
                         remainder = remainder.replace("(", "").replace("),", "").replace(")", "").strip()
                         fields = remainder.split(",")
-                        pk = Key(name, key_type=KeyType.PrimaryKey)
+                        pk = Key(QualifiedName(self.naming.string_to_name(""), name), key_type=KeyType.PrimaryKey)
                         for fieldname in fields:
                             pk_field = table.find_field(fieldname)
                             if pk_field is None:
@@ -209,9 +232,9 @@ class SqliteAdaptor(Adaptor):
                             local_fields = refmatch.group(1).split(",")
                             remote_table = refmatch.group(2)
                             remote_fields = refmatch.group(3).split(",")
-                            ref = Key(name, KeyType.ForeignKey)
+                            ref = Key(QualifiedName(self.naming.string_to_name(""), name), KeyType.ForeignKey)
                             ref.primary_table = remote_table
-                            ref.referenced_table = table.name.raw()
+                            ref.referenced_table = table.name
                             ref.primary_fields = remote_fields
                             ref.fields = local_fields
                             table.keys.append(ref)
@@ -237,13 +260,17 @@ class SqliteAdaptor(Adaptor):
 
                 if "primary key" in line:
                     required = True
-                    pk = Key(self.naming.string_to_name(f"pk_{table_name}"), key_type=KeyType.PrimaryKey)
+                    pk = Key(
+                        QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(f"pk_{table_name}")),
+                        key_type=KeyType.PrimaryKey)
                     pk.fields.append(name)
                     table.pk = pk
                     line = line.replace("primary key", "")
 
                 if "unique" in line:
-                    ux = Key(self.naming.string_to_name(f"ux_{table_name}_{ux_count}"), key_type=KeyType.Unique)
+                    ux = Key(QualifiedName(self.naming.string_to_name(""),
+                                           self.naming.string_to_name(f"ux_{table_name}_{ux_count}")),
+                             key_type=KeyType.Unique)
                     ux_count = ux_count + 1
                     ux.fields.append(name)
                     table.keys.append(ux)
@@ -258,26 +285,27 @@ class SqliteAdaptor(Adaptor):
                     index = find_in_list("default", words)
                     default_value = words[index + 1]
 
-                field = Field(self.naming.string_to_name(name), FieldType.get_fieldtype(type), required=required,
+                field = Field(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(name)), type,
+                              required=required,
                               auto_increment=auto_increment, default=default_value)
                 table.fields.append(field)
 
         if table.pk is not None and len(table.pk.fields) == 1:
             pk_field = table.find_field(table.pk.fields[0])
-            if pk_field.generic_type == FieldType.Integer:
+            if pk_field.generic_type == "integer":
                 pk_field.auto_increment = True
 
         return table
 
-    def replace_parameters(self, query: str) -> str:
-        return re.sub(r"::(\w+)::", r":\1", query)
+    # def replace_parameters(self, query: str) -> str:
+    #     return re.sub(r"::(\w+)::", r":\1", query)
 
-    def build_selection_list(self, fields: list) -> str:
-        field_list = []
-        for field in fields:
-            if field.table_alias != "":
-                field_str = f"{field.table_alias}.\"{field.name}\""
-            else:
-                field_str = f"\"{field.name}\""
-            field_list.append(field_str)
-        return str.join(", ", field_list)
+    # def build_selection_list(self, fields: list) -> str:
+    #     field_list = []
+    #     for field in fields:
+    #         if field.table_alias != "":
+    #             field_str = f"{field.table_alias}.\"{field.name}\""
+    #         else:
+    #             field_str = f"\"{field.name}\""
+    #         field_list.append(field_str)
+    #     return str.join(", ", field_list)

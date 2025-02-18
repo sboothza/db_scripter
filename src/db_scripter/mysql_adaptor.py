@@ -3,8 +3,9 @@ from typing import List
 
 import mysql.connector
 
-from database_objects import Database, Table, KeyType, FieldType, Key, Field, DataException, DatatypeException
+from database_objects import Database, Table, KeyType, Key, Field, DataException, DatatypeException, UDDT
 from adaptor import Adaptor
+from src.db_scripter.database_objects import QualifiedName
 
 
 class MySqlAdaptor(Adaptor):
@@ -23,7 +24,7 @@ class MySqlAdaptor(Adaptor):
         else:
             raise DataException("Invalid connection string")
 
-    def import_schema(self, db_name: str) -> Database:
+    def import_schema(self, db_name: str = None, options: {} = None) -> Database:
         connection = mysql.connector.connect(user=self.user, password=self.password, host=self.hostname,
                                              database=self.database)
 
@@ -36,17 +37,17 @@ class MySqlAdaptor(Adaptor):
         cursor.execute("select TABLE_NAME from INFORMATION_SCHEMA.tables where TABLE_SCHEMA = 'test' and "
                        "TABLE_TYPE = 'BASE TABLE'")
         for row in cursor.fetchall():
-            table = Table(self.naming.string_to_name(row[0]))
+            table = Table(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(row[0])))
             database.tables.append(table)
 
         for table in database.tables:
-            print(f"Processing fields for {table.name.raw()}...")
+            print(f"Processing fields for {table.name}...")
             cursor.execute("select COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, EXTRA, IS_NULLABLE, "
                            "NUMERIC_PRECISION, NUMERIC_SCALE, COLUMN_DEFAULT  from INFORMATION_SCHEMA.columns where "
-                           f"TABLE_SCHEMA = '{db_name}' and TABLE_NAME='{table.name.raw()}' order by ORDINAL_POSITION")
+                           f"TABLE_SCHEMA = '{db_name}' and TABLE_NAME='{table.name}' order by ORDINAL_POSITION")
 
             for row in cursor.fetchall():
-                field = Field(self.naming.string_to_name(str(row[0])),
+                field = Field(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(str(row[0]))),
                               auto_increment=True if "auto_increment" in str(row[3]).lower() else False,
                               required=str(row[4]).lower() != "yes")
                 self.get_field_type_defaults(row[1].decode("utf-8"), field, row[2] if row[2] is not None else 0, row[5],
@@ -65,7 +66,7 @@ class MySqlAdaptor(Adaptor):
                            "on fks.constraint_schema = kcu.table_schema "
                            "and fks.table_name = kcu.table_name "
                            "and fks.constraint_name = kcu.constraint_name "
-                           f"where fks.constraint_schema = '{db_name}' and fks.table_name = '{table.name.raw()}' "
+                           f"where fks.constraint_schema = '{db_name}' and fks.table_name = '{table.name}' "
                            "group by fks.constraint_name, fks.referenced_table_name "
                            "union "
                            "select s.INDEX_NAME as constraint_name, null as primary_table, "
@@ -75,19 +76,19 @@ class MySqlAdaptor(Adaptor):
                            "`type` from INFORMATION_SCHEMA.STATISTICS s left join "
                            "INFORMATION_SCHEMA.table_constraints c on s.TABLE_SCHEMA = c.TABLE_SCHEMA and "
                            "s.TABLE_NAME = c.TABLE_NAME and s.INDEX_NAME = c.CONSTRAINT_NAME "
-                           f"where s.TABLE_SCHEMA = '{db_name}' and s.TABLE_NAME = '{table.name.raw()}' "
+                           f"where s.TABLE_SCHEMA = '{db_name}' and s.TABLE_NAME = '{table.name}' "
                            "group by s.INDEX_NAME, s.NON_UNIQUE, c.CONSTRAINT_TYPE ")
             for row in cursor.fetchall():
-                key = Key(self.naming.string_to_name(row[0]))
-                key.referenced_table = table.name.raw()
-                key_type = row[5].lower()
+                key = Key(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(row[0])))
+                key.referenced_table = table.name
+                key_type = str(row[5].lower())
                 key.key_type = KeyType.get_keytype(key_type)
 
-                key.fields = [f.strip() for f in row[2].split(",")]
+                key.fields = [str(f.strip()) for f in row[2].split(",")]
 
                 if key.key_type == KeyType.ForeignKey:
                     key.primary_table = row[1]
-                    key.primary_fields = [f.strip() for f in row[3].split(",")]
+                    key.primary_fields = [str(f.strip()) for f in row[3].split(",")]
 
                 if key.key_type == KeyType.PrimaryKey:
                     table.pk = key
@@ -99,9 +100,9 @@ class MySqlAdaptor(Adaptor):
 
     @staticmethod
     def get_field_size(field: Field) -> str:
-        if field.generic_type == FieldType.String:
+        if field.generic_type == "string":
             return f"({field.size})"
-        elif field.generic_type == FieldType.Decimal:
+        elif field.generic_type == "decimal":
             return f"({field.size},{field.scale})"
         return ""
 
@@ -109,17 +110,17 @@ class MySqlAdaptor(Adaptor):
         return [f"`{value}`" for value in values]
 
     def generate_drop_script(self, table: Table) -> str:
-        return f"DROP TABLE `{table.name.raw()}`;"
+        return f"DROP TABLE `{table.name}`;"
 
     @staticmethod
     def get_field_default(field: Field) -> str:
-        if field.generic_type == FieldType.String or field.generic_type == FieldType.Datetime:
+        if field.generic_type == "string" or field.generic_type == "datetime":
             return f"'{field.default}'"
 
-    def generate_create_script(self, table: Table) -> str:
+    def generate_create_script(self, table: Table, original_db_type: str) -> str:
         sql: list[str] = []
         for field in table.fields:
-            sql.append(f"`{field.name.raw()}` {self.get_field_type(field.generic_type, field.size, field.scale)}"
+            sql.append(f"`{field.name}` {self.get_field_type(field, original_db_type)}"
                        f"{self.get_field_size(field)} {'NOT NULL' if field.required else 'NULL'}"
                        f"{' AUTO_INCREMENT' if field.auto_increment else ''}"
                        f"{' DEFAULT (' + self.get_field_default(field) + ')' if field.default else ''}")
@@ -130,60 +131,60 @@ class MySqlAdaptor(Adaptor):
             sql.append(f"FOREIGN KEY ({','.join(self.escape_field_list(fk.fields))}) REFERENCES "
                        f"{fk.primary_table}({','.join(self.escape_field_list(fk.primary_fields))})")
         joiner = ',\n\t'
-        result = f"CREATE TABLE `{table.name.raw()}` (\n\t{joiner.join(sql)}\n);\n"
+        result = f"CREATE TABLE `{table.name}` (\n\t{joiner.join(sql)}\n);\n"
 
         for key in table.keys:
             if key.key_type == KeyType.Unique:
-                result += f"CREATE UNIQUE INDEX `{key.name.raw()}` ON {table.name.raw()} " \
+                result += f"CREATE UNIQUE INDEX `{key.name}` ON {table.name} " \
                           f"({','.join(self.escape_field_list(key.fields))});\n"
 
             elif key.key_type == KeyType.Index:
-                result += f"CREATE INDEX `{key.name.raw()}` ON {table.name.raw()} " \
+                result += f"CREATE INDEX `{key.name}` ON {table.name} " \
                           f"({','.join(self.escape_field_list(key.fields))});\n"
 
         return result
 
     def generate_table_exists_script(self, table: Table, db_name: str) -> str:
         return f"select TABLE_NAME from INFORMATION_SCHEMA.tables where TABLE_SCHEMA = '{db_name}' and " \
-               f"TABLE_TYPE = 'BASE TABLE' and TABLE_NAME = '{table.name.raw()}'"
+               f"TABLE_TYPE = 'BASE TABLE' and TABLE_NAME = '{table.name}'"
 
     def generate_count_script(self, table: Table) -> str:
-        return f"select count(*) from `{table.name.raw()}`"
+        return f"select count(*) from `{table.name}`"
 
     def generate_insert_script(self, table: Table) -> str:
-        fields = [f.name.raw() for f in table.fields if not f.auto_increment]
+        fields = [f.name for f in table.fields if not f.auto_increment]
         params = ", ".join([f"`{f}`" for f in fields])
         values = ", ".join([f"%({f})s" for f in fields])
-        result = f"insert into `{table.name.raw()}` ({params}) values ({values});"
+        result = f"insert into `{table.name}` ({params}) values ({values});"
         return result
 
     def generate_update_script(self, table: Table) -> str:
-        fields = [f.name.raw() for f in table.fields if not f.auto_increment and f.name not in table.pk.fields]
+        fields = [f.name for f in table.fields if not f.auto_increment and f.name not in table.pk.fields]
         update_list = [f"`{f}` = %({f})s" for f in fields]
         update = ", ".join(update_list)
         key_list = [f"`{f}` = %({f})s" for f in table.pk.fields]
         key = " and ".join(key_list)
-        result = f"update `{table.name.raw()}` set {update} where {key};"
+        result = f"update `{table.name}` set {update} where {key};"
         return result
 
     def generate_delete_script(self, table: Table) -> str:
         key_list = [f"`{f}` = %({f})s" for f in table.pk.fields]
         key = " and ".join(key_list)
-        result = f"delete from `{table.name.raw()}` where {key};"
+        result = f"delete from `{table.name}` where {key};"
         return result
 
     def generate_fetch_by_id_script(self, table: Table) -> str:
-        field_list = [f"`{f.name.raw()}`" for f in table.fields]
+        field_list = [f"`{f.name}`" for f in table.fields]
         fields = ", ".join(field_list)
         key_list = [f"`{f}` = %({f})s" for f in table.pk.fields]
         key = " and ".join(key_list)
-        result = f"select {fields} from `{table.name.raw()}` where {key};"
+        result = f"select {fields} from `{table.name}` where {key};"
         return result
 
     def generate_item_exists_script(self, table: Table) -> str:
         key_list = [f"`{f}` = %({f})s" for f in table.pk.fields]
         key = " and ".join(key_list)
-        result = f"select count(*) from `{table.name.raw()}` where {key};"
+        result = f"select count(*) from `{table.name}` where {key};"
         return result
 
     @staticmethod
@@ -191,95 +192,98 @@ class MySqlAdaptor(Adaptor):
         value = value.lower()
         default = None if default is None else default.decode("utf-8")
         if value == "integer" or value == "int":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 4
         elif value == "bigint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 8
         elif value == "tinyint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 1
         elif value == "smallint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 2
         elif value == "mediumint":
-            field.generic_type = FieldType.Integer
+            field.generic_type = "integer"
             field.size = 3
         elif value == "float" or value == "real":
-            field.generic_type = FieldType.Float
+            field.generic_type = "float"
             field.size = 4
         elif value == "double":
-            field.generic_type = FieldType.Float
+            field.generic_type = "float"
             field.size = 8
         elif value == "boolean" or value == "bool":
-            field.generic_type = FieldType.Boolean
+            field.generic_type = "boolean"
             field.size = 1
         elif value == "decimal" or value == "money":
-            field.generic_type = FieldType.Decimal
+            field.generic_type = "decimal"
             field.size = precision
             field.scale = scale
         elif value == "string" or value == "varchar" or value == "char":
-            field.generic_type = FieldType.String
+            field.generic_type = "string"
             field.size = size
         elif value == "datetime" or value == "date":
-            field.generic_type = FieldType.Datetime
+            field.generic_type = "datetime"
             field.size = 0
         elif value == "none" or value == "undefined":
-            field.generic_type = FieldType.Undefined
+            field.generic_type = "undefined"
             field.size = 0
         else:
             raise DatatypeException("Unknown field type {}".format(value))
         field.default = default
 
-    def get_field_type(self, field_type: FieldType, size: int = 0, scale: int = 0) -> str:
-        if field_type == FieldType.Integer:
-            if size == 1:
+    def get_field_type(self, field: Field | UDDT, original_db_type: str) -> str:
+        if original_db_type == "mysql" and field.native_type is not None:
+            return field.native_type.name.raw()
+
+        if field.generic_type == "integer":
+            if field.size == 1:
                 return "TINYINT"
-            elif size == 2:
+            elif field.size == 2:
                 return "SMALLINT"
-            elif size == 3:
+            elif field.size == 3:
                 return "MEDIUMINT"
-            elif size == 4:
+            elif field.size == 4:
                 return "INT"
-            elif size == 8:
+            elif field.size == 8:
                 return "BIGINT"
             else:
                 raise DatatypeException("Unknown field size")
 
-        elif field_type == FieldType.String:
+        elif field.generic_type == "string":
             return "VARCHAR"
-        elif field_type == FieldType.Float:
-            if size == 4:
+        elif field.generic_type == "float":
+            if field.size == 4:
                 return "FLOAT"
-            elif size == 8:
+            elif field.size == 8:
                 return "DOUBLE"
             else:
                 raise DatatypeException("Unknown float size")
 
-        elif field_type == FieldType.Decimal:
+        elif field.generic_type == "decimal":
             return "DECIMAL"
-        elif field_type == FieldType.Datetime:
+        elif field.generic_type == "datetime":
             return "DATETIME"
-        elif field_type == FieldType.Boolean:
+        elif field.generic_type == "boolean":
             return "TINYINT"
         else:
             raise DatatypeException("Unknown field type ")
 
-    def must_remap_field(self, field_type: FieldType) -> tuple[bool, FieldType]:
-        if field_type == FieldType.Integer:
-            return False, FieldType.Integer
-        elif field_type == FieldType.String:
-            return False, FieldType.String
-        elif field_type == FieldType.Float:
-            return False, FieldType.Float
-        elif field_type == FieldType.Decimal:
-            return False, FieldType.Decimal
-        elif field_type == FieldType.Datetime:
-            return False, FieldType.Datetime
-        elif field_type == FieldType.Boolean:
-            return True, FieldType.Integer
-        else:
-            raise DatatypeException("Unknown field type ")
+    # def must_remap_field(self, field_type: FieldType) -> tuple[bool, FieldType]:
+    #     if field_type == FieldType.Integer:
+    #         return False, FieldType.Integer
+    #     elif field_type == FieldType.String:
+    #         return False, FieldType.String
+    #     elif field_type == FieldType.Float:
+    #         return False, FieldType.Float
+    #     elif field_type == FieldType.Decimal:
+    #         return False, FieldType.Decimal
+    #     elif field_type == FieldType.Datetime:
+    #         return False, FieldType.Datetime
+    #     elif field_type == FieldType.Boolean:
+    #         return True, FieldType.Integer
+    #     else:
+    #         raise DatatypeException("Unknown field type ")
 
     def replace_parameters(self, query: str) -> str:
         return re.sub(r"::(\w+)::", r"%(\1)s", query)

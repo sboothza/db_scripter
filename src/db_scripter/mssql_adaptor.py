@@ -64,6 +64,8 @@ class MsSqlAdaptor(Adaptor):
             db_name = self.database
 
         database = Database(Name(db_name))
+        database.imported_db_type = "mssql"
+
         cursor = connection.cursor(as_dict=True)
 
         if options["exclude-udts"]:
@@ -142,7 +144,7 @@ class MsSqlAdaptor(Adaptor):
                     view = View(QualifiedName(self.naming.string_to_name(row["schema_name"]),
                                               self.naming.string_to_name(row["view_name"])))
                     view.definition = row["definition"]
-                    database.tables.append(view)
+                    database.views.append(view)
 
                 if "." in row["name"]:
                     names = (str(row["name"])).split(".")
@@ -419,7 +421,7 @@ class MsSqlAdaptor(Adaptor):
         counter = 1
         for table in database.tables:
             with open(os.path.join(local_path, f"{counter:03}-{table.name.name}.sql"), "w", 1024, encoding="utf8") as f:
-                f.write(self.generate_create_script(table))
+                f.write(self.generate_create_script(table, database.imported_db_type))
                 f.flush()
             counter += 1
 
@@ -464,7 +466,7 @@ class MsSqlAdaptor(Adaptor):
         create_dir(local_path)
         for udt in database.uddts:
             with open(os.path.join(local_path, udt.name.name.raw() + ".sql"), "w", 1024, encoding="utf8") as f:
-                f.write(self.generate_create_uddt_script(udt))
+                f.write(self.generate_create_uddt_script(udt, database.imported_db_type))
                 f.flush()
 
         print("Writing UDTT scripts....")
@@ -472,7 +474,7 @@ class MsSqlAdaptor(Adaptor):
         create_dir(local_path)
         for udt in database.udtts:
             with open(os.path.join(local_path, udt.name.name.raw() + ".sql"), "w", 1024, encoding="utf8") as f:
-                f.write(self.generate_create_udtt_script(udt))
+                f.write(self.generate_create_udtt_script(udt, database.imported_db_type))
                 f.flush()
 
         print("Writing SP scripts....")
@@ -517,10 +519,10 @@ class MsSqlAdaptor(Adaptor):
             return f"'{field.default}'"
         return field.default
 
-    def generate_create_script(self, table: Table) -> str:
+    def generate_create_script(self, table: Table, original_db_type:str) -> str:
         sql: list[str] = []
         for field in table.fields:
-            field_sql = (f"[{field.name}] {self.get_field_type(field)}"
+            field_sql = (f"[{field.name}] {self.get_field_type(field, original_db_type)}"
                          f"{self.get_field_size(field)} {'NOT NULL' if field.required else 'NULL'}"
                          f"{' IDENTITY(1, 1)' if field.auto_increment else ''}"
                          f"{' DEFAULT (' + self.get_field_default(field) + ')' if field.default else ''}")
@@ -550,16 +552,16 @@ class MsSqlAdaptor(Adaptor):
         sql = sp.text
         return sql
 
-    def generate_create_uddt_script(self, udt: UDDT) -> str:
+    def generate_create_uddt_script(self, udt: UDDT, original_db_type:str) -> str:
         sql = f"CREATE TYPE {udt.name.schema}.{udt.name.name} FROM "
-        f"[{udt.generic_type}] {self.get_field_type(udt)}"
+        f"[{udt.generic_type}] {self.get_field_type(udt, original_db_type)}"
         f"{self.get_field_size(udt)} {'NOT NULL' if udt.required else 'NULL'}"
         return sql
 
-    def generate_create_udtt_script(self, udt: UDTT) -> str:
+    def generate_create_udtt_script(self, udt: UDTT, original_db_type:str) -> str:
         sql = f"CREATE TYPE [{udt.name.schema}].[{udt.name.name}] AS TABLE ("
 
-        field_sql = [f"[{field.name.name}] {self.get_field_type(field)} "
+        field_sql = [f"[{field.name.name}] {self.get_field_type(field, original_db_type)} "
                      f"{self.get_field_size(field)} {'NOT NULL' if field.required else 'NULL'}"
                      f"{' IDENTITY(1, 1)' if field.auto_increment else ''} " for field in udt.fields]
 
@@ -630,8 +632,8 @@ class MsSqlAdaptor(Adaptor):
 
         field.default = default
 
-    def get_field_type(self, field: Field | UDDT) -> str:
-        if field.native_type is not None:
+    def get_field_type(self, field: Field | UDDT, original_db_type:str) -> str:
+        if original_db_type == "mssql" and field.native_type is not None:
             return field.native_type.name.raw()
 
         if field.generic_type == "integer":

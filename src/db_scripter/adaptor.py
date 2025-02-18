@@ -57,10 +57,10 @@ class Adaptor(object):
 
         return tables
 
-    def generate_create_script(self, table: Table) -> str:
+    def generate_create_script(self, table: Table, original_db_type:str) -> str:
         ...
 
-    def get_field_type(self, field: Field | UDDT) -> str:
+    def get_field_type(self, field: Field | UDDT, original_db_type:str) -> str:
         ...
 
     def escape_field_list(self, values: List[str]) -> List[str]:
