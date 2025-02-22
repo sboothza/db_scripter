@@ -3,7 +3,7 @@ import re
 import sqlite3
 from typing import Union, List
 
-from database_objects import Database, Table, KeyType, Key, Field, DatatypeException, DataException, UDDT
+from database_objects import Database, Table, KeyType, Key, Field, DatatypeException, DataException, UDDT, View
 from adaptor import Adaptor
 from common import get_fullname, get_filename, clean_string, find_in_list, create_dir
 from src.db_scripter.database_objects import QualifiedName
@@ -52,6 +52,18 @@ class SqliteAdaptor(Adaptor):
                 f.flush()
             counter += 1
 
+        print("Writing view scripts....")
+        local_path = os.path.join(path, "views")
+
+        create_dir(local_path, delete=True)
+
+        counter = 1
+        for view in database.views:
+            with open(os.path.join(local_path, f"{counter:03}-{view.name.name}.sql"), "w", 1024, encoding="utf8") as f:
+                f.write(self.generate_create_view_script(view, database.imported_db_type))
+                f.flush()
+            counter += 1
+
     def escape_field_list(self, values: List[str]) -> List[str]:
         return ["\"" + value + "\"" for value in values]
 
@@ -79,6 +91,9 @@ class SqliteAdaptor(Adaptor):
                           f"({','.join(self.escape_field_list(key.fields))});\n"
 
         return result
+
+    def generate_create_view_script(self, view: View, original_db_type: str) -> str:
+        return view.definition
 
     # def generate_table_exists_script(self, table: Table, db_name: str) -> str:
     #     return f"SELECT name FROM sqlite_schema WHERE type='table' and name = '{table.name}'"
@@ -138,6 +153,12 @@ class SqliteAdaptor(Adaptor):
         elif field.generic_type == "datetime":
             return "REAL"
         elif field.generic_type == "boolean":
+            return "INTEGER"
+        elif field.generic_type == "binary":
+            return "TEXT"
+        elif field.generic_type == "hierarchy":
+            return "INTEGER"
+        elif field.generic_type == "uniqueidentifier":
             return "INTEGER"
         else:
             raise DatatypeException("Unknown field type ")

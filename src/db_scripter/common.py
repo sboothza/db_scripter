@@ -3,12 +3,16 @@ import shutil
 from pathlib import Path
 
 
-def create_dir(path: str, delete:bool=False):
+def create_dir(path: str, delete: bool = False):
     if not os.path.exists(path) or not delete:
-        os.mkdir(path)
+        os.makedirs(path, exist_ok=True)
     else:
         shutil.rmtree(path)
         os.mkdir(path)
+
+
+def is_str_char(c: str) -> bool:
+    return c.isidentifier() or c == "[" or c == "]" or c == "." or c == "'"
 
 
 def get_fullname(path: str) -> str:

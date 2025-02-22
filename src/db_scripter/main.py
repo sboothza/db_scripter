@@ -1,5 +1,6 @@
 import argparse
 
+import orjson
 from sb_serializer import Naming, HardSerializer
 
 from adaptor_factory import AdaptorFactory
@@ -76,6 +77,7 @@ def main():
     elif args.operation == "export-schema":
         with open(args.schema_file, "r", 1024, encoding="utf8") as f:
             json = f.read()
+
 
         db = serializer.de_serialize(json, Database)
 
