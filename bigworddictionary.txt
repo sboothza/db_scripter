@@ -7,6 +7,16 @@ customer,status
 customer,statuses
 customer,special
 exemption,serial
+acc,type
+ext,rates
+t,acc
+pay,at
+un,met
+get,ext
+sp,get
+sp,get,accounting,history
+get,accounting,start,date
+get,accounting,end,date
 human,resources
 hire,date
 print,error

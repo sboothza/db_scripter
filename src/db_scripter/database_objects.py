@@ -1,18 +1,21 @@
-from enum import Enum, auto, Flag
+from enum import Enum, auto
 from typing import List
 
 from sb_serializer import Name, Naming
 
 
 class DataException(Exception):
-    pass
+    ...
 
 
 class DatatypeException(DataException):
-    pass
+    ...
 
 
 class QualifiedName:
+    """
+    QualifiedName - schema + name
+    """
     schema: Name
     name: Name
 
@@ -36,31 +39,59 @@ class QualifiedName:
         return hash(str(self))
 
 
-class SchemaObject:
-    name: QualifiedName
+class OperationType(Enum):
+    Create = 1
+    Drop = 2
+    Modify = 3
+    Retain = 4
 
-    def __init__(self, name: QualifiedName = None):
+
+class SchemaObject:
+    """
+    Base class for schema entities - tables, views, sp, everything
+    Stores a name (schema + name)
+    """
+    name: QualifiedName
+    operation: OperationType
+
+    def __init__(self, name: QualifiedName = None, operation: OperationType = OperationType.Retain):
         self.name = name
+        self.operation = operation
 
     def __str__(self):
         return str(self.name)
 
+    def __eq__(self, other):
+        return self.name == other.name
 
-class FieldType(SchemaObject):
-    def __init__(self, name: QualifiedName = None):
-        super().__init__(name)
+    def __hash__(self):
+        return hash(self.name)
+
+    def finalise(self):
+        """
+        sort lists, do cleanups
+        :return:
+        """
+        ...
+
+
+# class FieldType(SchemaObject):
+#     def __init__(self, name: QualifiedName = None):
+#         super().__init__(name)
 
 
 class UDDT(SchemaObject):
-    name: QualifiedName
-    generic_type: FieldType
+    """
+    User defined data type
+    """
+    generic_type: str
     size: int
     scale: int
     required: bool
-    native_type: str
+    native_type: QualifiedName
 
-    def __init__(self, name: QualifiedName = None, generic_type: FieldType = None, size: int = 0,
-                 scale: int = 0, required: bool = False, native_type: str = None):
+    def __init__(self, name: QualifiedName = None, generic_type: str = None, size: int = 0,
+                 scale: int = 0, required: bool = False, native_type: QualifiedName = None):
         super().__init__(name)
         self.generic_type = generic_type
         self.size = size
@@ -71,20 +102,39 @@ class UDDT(SchemaObject):
     def __str__(self):
         return str(self.name)
 
+    def __eq__(self, other):
+        return (self.name == other.name and self.generic_type == other.generic_type and self.size == other.size
+                and self.scale == other.scale and self.required == other.required
+                and self.native_type == other.native_type)
+
+    def __hash__(self):
+        return hash((self.name, self.generic_type, self.size, self.scale, self.required, self.native_type))
+
 
 class Field(SchemaObject):
-    generic_type: FieldType
+    """
+    Field or column of a table or view
+    """
+
+    generic_type: str
+    """
+        generic_type - db agnostic field type
+    """
+
+    native_type: QualifiedName
+    """
+        native_type - native db type as imported
+    """
     size: int
     scale: int
     auto_increment: bool
     default: str
     required: bool
-    native_type: str
 
-    def __init__(self, name: QualifiedName = None, generic_type: FieldType = None,
+    def __init__(self, name: QualifiedName = None, generic_type: str = None,
                  size: int = 0,
                  scale: int = 0, auto_increment: bool = False, default=None, required: bool = False,
-                 native_type: str = None):
+                 native_type: QualifiedName = None):
         super().__init__(name)
         self.generic_type = generic_type
         self.size = size
@@ -97,6 +147,16 @@ class Field(SchemaObject):
     def __str__(self):
         return f"{str(self.name)} {self.generic_type} ({self.size},{self.scale}) {'AUTOINC ' if self.auto_increment else ''}" \
                f"{'DEFAULT ' + self.default + ' ' if self.default else ''}{'NOT NULL' if self.required else 'NULL'}"
+
+    def __eq__(self, other):
+        return (self.name == other.name and self.generic_type == other.generic_type and self.size == other.size
+                and self.scale == other.scale and self.auto_increment == other.auto_increment
+                and self.default == other.default and self.required == other.required
+                and self.native_type == other.native_type)
+
+    def __hash__(self):
+        return hash((self.name, self.generic_type, self.size, self.scale, self.auto_increment, self.default,
+                     self.required, self.native_type))
 
 
 class KeyType:
@@ -165,6 +225,21 @@ class Key(SchemaObject):
         return f"{self.name} {self.key_type} {','.join(self.fields)}{self.primary_table}" \
                f"{'' if len(self.primary_fields) == 0 else ','.join(self.primary_fields)}"
 
+    def __eq__(self, other):
+        if other is not Key:
+            return False
+
+        return (self.name == other.name and self.fields == other.fields and self.primary_table == other.primary_table
+                and self.primary_fields == other.primary_fields and self.referenced_table == other.referenced_table
+                and self.key_type == other.key_type)
+
+    def __hash__(self):
+        return hash(
+            (self.name, self.fields, self.primary_table, self.primary_fields, self.referenced_table, self.key_type))
+
+    def finalise(self):
+        self.fields.sort()
+
 
 class AscendingOrDescendingType:
     ...
@@ -210,6 +285,13 @@ class Dependancy:
     def __str__(self):
         return str(self.obj)
 
+    def __eq__(self, other):
+        return (self.name == other.name and self.obj == other.obj and self.referenced_obj == other.referenced_obj
+                and self.obj_type == other.obj_type)
+
+    def __hash__(self):
+        return hash((self.name, self.obj, self.referenced_obj, self.obj_type))
+
 
 class Constraint(SchemaObject):
     table_name: QualifiedName
@@ -222,6 +304,12 @@ class Constraint(SchemaObject):
 
     def __str__(self):
         return str(self.name)
+
+    def __eq__(self, other):
+        return self.name == other.name and self.table_name == other.table_name and self.definition == other.definition
+
+    def __hash__(self):
+        return hash((self.name, self.table_name, self.definition))
 
 
 class Table(SchemaObject):
@@ -246,9 +334,32 @@ class Table(SchemaObject):
         else:
             raise DataException("Could not find field")
 
+    def __eq__(self, other):
+        if other is not Table:
+            return False
+
+        return (self.name == other.name and self.fields == other.fields and self.pk == other.pk
+                and self.keys == other.keys and self.foreign_keys == other.foreign_keys
+                and self.constraints == other.constraints)
+
+    def __hash__(self):
+        return hash((self.name, self.fields, self.pk, self.keys, self.foreign_keys, self.constraints))
+
+    def finalise(self):
+        self.fields.sort()
+        self.keys.sort()
+        self.foreign_keys.sort()
+        self.constraints.sort()
+
 
 class View(Table):
     definition: str
+
+    def __eq__(self, other):
+        return self.name == other.name and self.definition == other.definition
+
+    def __hash__(self):
+        return hash((self.name, self.definition))
 
 
 class StoredProcedure(SchemaObject):
@@ -258,9 +369,18 @@ class StoredProcedure(SchemaObject):
         super().__init__(name)
         self.text = text
 
+    def __eq__(self, other):
+        return self.name == other.name and self.text == other.text
+
+    def __hash__(self):
+        return hash((self.name, self.text))
+
 
 class UDTT(SchemaObject):
-    name: QualifiedName
+    """
+    User defined table type
+    """
+
     fields: list[Field]
 
     def __init__(self, name: QualifiedName = None, fields: list[Field] = None):
@@ -273,6 +393,15 @@ class UDTT(SchemaObject):
             return found_fields[0]
         else:
             raise DataException("Could not find field")
+
+    def __eq__(self, other):
+        return self.name == other.name and self.fields == other.fields
+
+    def __hash__(self):
+        return hash((self.name, self.fields))
+
+    def finalise(self):
+        self.fields.sort()
 
 
 class FunctionType:
@@ -303,24 +432,38 @@ class Function(SchemaObject):
         self.text = text
         self.type = type
 
+    def __eq__(self, other):
+        return self.name == other.name and self.text == other.text and self.type == other.type
+
+    def __hash__(self):
+        return hash((self.name, self.text, self.type))
+
+
+class Database:
+    ...
+
 
 class Database(object):
     name: Name
     tables: List[Table]
+    views: List[View]
     stored_procedures: List[StoredProcedure]
     functions: List[Function]
     uddts: List[UDDT]
     udtts: List[UDTT]
-    dependencies: List[Dependancy]
+    dependancies: List[Dependancy]
+    imported_db_type: str
 
     def __init__(self, name: Name = None):
         self.name = name
         self.tables: List[Table] = []
+        self.views: List[View] = []
         self.stored_procedures: List[StoredProcedure] = []
         self.functions: List[Function] = []
         self.uddts: List[UDDT] = []
         self.udtts: List[UDTT] = []
-        self.dependencies: List[Dependancy] = []
+        self.dependancies: List[Dependancy] = []
+        self.imported_db_type = ""
 
     def get_object(self, name: QualifiedName, type: str) -> SchemaObject | None:
         if type == "Table" or type == "View":
@@ -375,4 +518,60 @@ class Database(object):
         self.dependencies = [d for d in self.dependencies if
                              self.get_table(d.obj) is None or self.get_table(d.referenced_obj) is None]
 
-        self.dependencies = self.dependencies[:count]
+        self.dependancies = self.dependancies[:count]
+
+    def get_diff(self, target_database: Database):
+        diff_db: Database = Database(target_database.name)
+
+        # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
+        tables = [table for table in target_database.tables if table not in self.tables]
+        for table in tables:
+            table.operation = OperationType.Create
+
+        diff_db.tables.extend(tables)
+
+        tables = [table for table in self.tables if table not in target_database.tables]
+        for table in tables:
+            table.operation = OperationType.Drop
+
+        diff_db.tables.extend(tables)
+
+    def diff_entity(self, current:list[SchemaObject], new:list[SchemaObject])->list[SchemaObject]:
+        # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
+
+        diff_objs: list[SchemaObject]=[]
+
+        objects = [obj for obj in new if obj not in current]
+        for obj in objects:
+            obj.operation = OperationType.Create
+
+        diff_objs.extend(objects)
+
+        objects = [obj for obj in current if obj not in new]
+        for obj in objects:
+            obj.operation = OperationType.Drop
+
+        diff_objs.extend(objects)
+
+    def finalise(self):
+        self.tables.sort()
+        self.views.sort()
+        self.functions.sort()
+        self.stored_procedures.sort()
+        self.udtts.sort()
+        self.dependancies.sort()
+        self.uddts.sort()
+
+
+class Term(object):
+    ...
+
+
+class Expression(object):
+    ...
+
+
+class SelectStatement(object):
+    fields: list[Field]
+    tables: list[Table]
+    where_clause: Expression

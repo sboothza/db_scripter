@@ -1,7 +1,7 @@
 [build-system]
 requires = ["pip>=22.3.1",
-            "setuptools>=66.0.0",
-            "wheel>=0.38.4"]
+    "setuptools>=66.0.0",
+    "wheel>=0.38.4"]
 
 build-backend = "setuptools.build_meta"
 
@@ -23,3 +23,4 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = []
+
