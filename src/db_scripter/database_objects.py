@@ -1,7 +1,7 @@
 from enum import Enum, auto
 from typing import List
 
-from sb_serializer import Name, Naming
+from sb_serializer import Name
 
 
 class DataException(Exception):
@@ -465,6 +465,22 @@ class Database(object):
         self.dependancies: List[Dependancy] = []
         self.imported_db_type = ""
 
+    def get_unknown_object(self, name: QualifiedName) -> SchemaObject:
+        obj = self.get_table(name)
+        if obj is None:
+            obj = self.get_stored_procedure(name)
+
+        if obj is None:
+            obj = self.get_function(name)
+
+        if obj is None:
+            obj = self.get_type(name)
+
+        if obj is None:
+            obj = self.get_table_type(name)
+
+        return obj
+
     def get_object(self, name: QualifiedName, type: str) -> SchemaObject | None:
         if type == "Table" or type == "View":
             return self.get_table(name)
@@ -499,8 +515,8 @@ class Database(object):
             return result[0]
         return None
 
-    def get_type(self, name: str) -> UDDT | None:
-        result = [t for t in self.uddts if t.name.name.lower() == name.lower()]
+    def get_type(self, name: QualifiedName) -> UDDT | None:
+        result = [t for t in self.uddts if t.name.name.lower() == name.name.lower()]
         if len(result) > 0:
             return result[0]
         return None
@@ -524,43 +540,65 @@ class Database(object):
         diff_db: Database = Database(target_database.name)
 
         # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
-        tables = [table for table in target_database.tables if table not in self.tables]
-        for table in tables:
-            table.operation = OperationType.Create
+        diff_db.tables = self.diff_entity(self.tables, target_database.tables)
+        diff_db.views = self.diff_entity(self.views, target_database.views)
+        diff_db.stored_procedures = self.diff_entity(self.stored_procedures, target_database.stored_procedures)
+        diff_db.functions = self.diff_entity(self.functions, target_database.functions)
+        diff_db.udtts = self.diff_entity(self.udtts, target_database.udtts)
+        diff_db.uddts = self.diff_entity(self.uddts, target_database.uddts)
+        diff_db.dependancies = self.dependancies.extend(target_database.dependancies)
+        diff_db.finalise()
 
-        diff_db.tables.extend(tables)
+    def clean_dependancies(self):
+        new_dependencies: list[Dependancy] = []
+        for dependency in self.dependancies:
+            obj = self.get_unknown_object(dependency.obj)
+            if obj is not None:
+                obj = self.get_unknown_object(dependency.referenced_obj)
+                if obj is not None:
+                    new_dependencies.append(dependency)
 
-        tables = [table for table in self.tables if table not in target_database.tables]
-        for table in tables:
-            table.operation = OperationType.Drop
+        self.dependancies = new_dependencies
 
-        diff_db.tables.extend(tables)
-
-    def diff_entity(self, current:list[SchemaObject], new:list[SchemaObject])->list[SchemaObject]:
+    def diff_entity(self, current: list[SchemaObject], new: list[SchemaObject]) -> list[SchemaObject]:
         # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
 
-        diff_objs: list[SchemaObject]=[]
+        diff_objs: list[SchemaObject] = []
 
         objects = [obj for obj in new if obj not in current]
         for obj in objects:
             obj.operation = OperationType.Create
-
         diff_objs.extend(objects)
 
         objects = [obj for obj in current if obj not in new]
         for obj in objects:
             obj.operation = OperationType.Drop
-
         diff_objs.extend(objects)
 
+        # check for changes
+        for obj in current:
+            new_obj = self.find_entity(new, obj.name)
+            if obj is not None and obj != new_obj:
+                new_obj.operation = OperationType.Modify
+                diff_objs.append(new_obj)
+
+        return diff_objs
+
+    def find_entity(self, objs: list[SchemaObject], name: QualifiedName) -> SchemaObject:
+        result = [obj for obj in objs if obj.name == name]
+        if len(result) > 0:
+            return result[0]
+        return None
+
     def finalise(self):
-        self.tables.sort()
-        self.views.sort()
-        self.functions.sort()
-        self.stored_procedures.sort()
-        self.udtts.sort()
-        self.dependancies.sort()
-        self.uddts.sort()
+        self.tables.sort(key=lambda x: str(x.name).lower())
+        self.views.sort(key=lambda x: str(x.name).lower())
+        self.functions.sort(key=lambda x: str(x.name).lower())
+        self.stored_procedures.sort(key=lambda x: str(x.name).lower())
+        self.udtts.sort(key=lambda x: str(x.name).lower())
+        self.dependancies.sort(key=lambda x: str(x.obj.name).lower())
+        self.uddts.sort(key=lambda x: str(x.name).lower())
+        self.clean_dependancies()
 
 
 class Term(object):
