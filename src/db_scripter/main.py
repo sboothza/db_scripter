@@ -5,19 +5,20 @@ from sb_serializer import Naming, HardSerializer
 
 from adaptor_factory import AdaptorFactory
 from database_objects import Database
+from src.db_scripter.common import naming, serializer
 from src.db_scripter.options import Options
 
 
 def main():
     parser = argparse.ArgumentParser(description="DB Scripter")
-    parser.add_argument('--dictionary-file',
-                        help='Path to dictionary file',
-                        dest='dictionary_file',
-                        required=True)
-    parser.add_argument('--big-dictionary-file',
-                        help='Path to big dictionary file',
-                        dest='big_dictionary_file',
-                        required=True)
+    # parser.add_argument('--dictionary-file',
+    #                     help='Path to dictionary file',
+    #                     dest='dictionary_file',
+    #                     required=True)
+    # parser.add_argument('--big-dictionary-file',
+    #                     help='Path to big dictionary file',
+    #                     dest='big_dictionary_file',
+    #                     required=True)
     parser.add_argument('--connection-string',
                         help='DB Connection String',
                         dest='connection_string')
@@ -39,10 +40,10 @@ def main():
 
     args = parser.parse_args()
 
-    naming = Naming(args.dictionary_file, args.big_dictionary_file)
-    serializer = HardSerializer(naming=naming)
+    # naming = Naming(args.dictionary_file, args.big_dictionary_file)
+    # serializer = HardSerializer(naming=naming)
 
-    adaptor = AdaptorFactory.get_adaptor_for_connection_string(args.connection_string, naming)
+    adaptor = AdaptorFactory.get_adaptor_for_connection_string(args.connection_string)
     # adaptor = AdaptorFactory.get_adaptor_for_connection_string("mssql://DV4-POLSQLAG-01/Polly_C?integrated_authentication=True", naming)
 
     options = Options()

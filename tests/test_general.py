@@ -5,6 +5,7 @@ from sb_serializer import Naming, HardSerializer
 from src.db_scripter.database_objects import View
 from src.db_scripter.options import Options
 from src.db_scripter.query_parser import Parser, SqlSelectToken, SqlStarToken, SqlFromToken, SqlLiteralToken
+from tests.common import naming, serializer
 
 
 class TestGeneral(unittest.TestCase):
@@ -22,13 +23,13 @@ class TestGeneral(unittest.TestCase):
 
     def test_dict(self):
         word = "ufnGetAccountingEndDate"
-        naming = Naming("S:\\src\\pvt\\db_scripter\\dictionary.txt", "S:\\src\\pvt\\db_scripter\\bigworddictionary.txt")
+        # naming = Naming("S:\\src\\pvt\\db_scripter\\dictionary.txt", "S:\\src\\pvt\\db_scripter\\bigworddictionary.txt")
         name = naming.string_to_name(word)
         print(name.name)
 
     def test_view(self):
-        naming = Naming("S:\\src\\pvt\\db_scripter\\dictionary.txt", "S:\\src\\pvt\\db_scripter\\bigworddictionary.txt")
-        serializer = HardSerializer(naming=naming)
+        # naming = Naming("S:\\src\\pvt\\db_scripter\\dictionary.txt", "S:\\src\\pvt\\db_scripter\\bigworddictionary.txt")
+        # serializer = HardSerializer(naming=naming)
         json = ""
         with open("test_view.json", 'r', encoding="utf-8") as file:
             json = file.read()

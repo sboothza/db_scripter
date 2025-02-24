@@ -5,15 +5,15 @@ from typing import Union, List
 
 from database_objects import Database, Table, KeyType, Key, Field, DatatypeException, DataException, UDDT, View
 from adaptor import Adaptor
-from common import get_fullname, get_filename, clean_string, find_in_list, create_dir
+from common import get_fullname, get_filename, clean_string, find_in_list, create_dir, naming
 from src.db_scripter.database_objects import QualifiedName
 
 
 class SqliteAdaptor(Adaptor):
     """ Connection string is sqlite://filename or sqlite://memory """
 
-    def __init__(self, connection, naming):
-        super().__init__(connection, naming)
+    def __init__(self, connection):
+        super().__init__(connection)
         connection_string = self.connection.replace("sqlite://", "")
         if connection_string == "memory":
             self.connection = "file::memory:?cache=shared"
@@ -25,7 +25,7 @@ class SqliteAdaptor(Adaptor):
         if db_name is None:
             db_name = get_filename(self.connection)
 
-        database = Database(self.naming.string_to_name(db_name))
+        database = Database(naming.string_to_name(db_name))
 
         cursor = connection.execute("SELECT sql FROM sqlite_master WHERE type='table'", [])
         for row in cursor.fetchall():
@@ -194,7 +194,7 @@ class SqliteAdaptor(Adaptor):
                     if table_name == "sqlite_sequence":
                         return None
 
-                    table = Table(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(table_name)))
+                    table = Table(QualifiedName(naming.string_to_name(""), naming.string_to_name(table_name)))
                 else:
                     raise DataException("create table issue")
 
@@ -205,7 +205,7 @@ class SqliteAdaptor(Adaptor):
                 if match:
                     fields = match.group(1).split(",")
                     pk = Key(
-                        QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(f"pk_{table_name}")),
+                        QualifiedName(naming.string_to_name(""), naming.string_to_name(f"pk_{table_name}")),
                         key_type=KeyType.PrimaryKey)
                     for fieldname in fields:
                         pk_field = table.find_field(fieldname)
@@ -219,8 +219,8 @@ class SqliteAdaptor(Adaptor):
                 match = re.search(r"UNIQUE \((.*)\),?", line)
                 if match:
                     fields = match.group(1).split(",")
-                    ux = Key(QualifiedName(self.naming.string_to_name(""),
-                                           self.naming.string_to_name(f"ux_{table_name}_{ux_count}")),
+                    ux = Key(QualifiedName(naming.string_to_name(""),
+                                           naming.string_to_name(f"ux_{table_name}_{ux_count}")),
                              key_type=KeyType.Unique)
                     ux_count = ux_count + 1
                     for fieldname in fields:
@@ -234,13 +234,13 @@ class SqliteAdaptor(Adaptor):
             elif line.startswith("CONSTRAINT"):
                 match = re.search(r"CONSTRAINT (\w+) (PRIMARY KEY|FOREIGN KEY)(.*)", line)
                 if match:
-                    name = self.naming.string_to_name(match.group(1))
+                    name = naming.string_to_name(match.group(1))
                     type = match.group(2)
                     remainder = match.group(3)
                     if type == "PRIMARY KEY":
                         remainder = remainder.replace("(", "").replace("),", "").replace(")", "").strip()
                         fields = remainder.split(",")
-                        pk = Key(QualifiedName(self.naming.string_to_name(""), name), key_type=KeyType.PrimaryKey)
+                        pk = Key(QualifiedName(naming.string_to_name(""), name), key_type=KeyType.PrimaryKey)
                         for fieldname in fields:
                             pk_field = table.find_field(fieldname)
                             if pk_field is None:
@@ -253,7 +253,7 @@ class SqliteAdaptor(Adaptor):
                             local_fields = refmatch.group(1).split(",")
                             remote_table = refmatch.group(2)
                             remote_fields = refmatch.group(3).split(",")
-                            ref = Key(QualifiedName(self.naming.string_to_name(""), name), KeyType.ForeignKey)
+                            ref = Key(QualifiedName(naming.string_to_name(""), name), KeyType.ForeignKey)
                             ref.primary_table = remote_table
                             ref.referenced_table = table.name
                             ref.primary_fields = remote_fields
@@ -282,15 +282,15 @@ class SqliteAdaptor(Adaptor):
                 if "primary key" in line:
                     required = True
                     pk = Key(
-                        QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(f"pk_{table_name}")),
+                        QualifiedName(naming.string_to_name(""), naming.string_to_name(f"pk_{table_name}")),
                         key_type=KeyType.PrimaryKey)
                     pk.fields.append(name)
                     table.pk = pk
                     line = line.replace("primary key", "")
 
                 if "unique" in line:
-                    ux = Key(QualifiedName(self.naming.string_to_name(""),
-                                           self.naming.string_to_name(f"ux_{table_name}_{ux_count}")),
+                    ux = Key(QualifiedName(naming.string_to_name(""),
+                                           naming.string_to_name(f"ux_{table_name}_{ux_count}")),
                              key_type=KeyType.Unique)
                     ux_count = ux_count + 1
                     ux.fields.append(name)
@@ -306,7 +306,7 @@ class SqliteAdaptor(Adaptor):
                     index = find_in_list("default", words)
                     default_value = words[index + 1]
 
-                field = Field(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(name)), type,
+                field = Field(QualifiedName(naming.string_to_name(""), naming.string_to_name(name)), type,
                               required=required,
                               auto_increment=auto_increment, default=default_value)
                 table.fields.append(field)

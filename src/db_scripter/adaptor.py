@@ -1,12 +1,12 @@
 from typing import List
 from sb_serializer import Naming, HardSerializer
 from database_objects import Table, Database, KeyType, Field, UDDT
+from src.db_scripter.common import serializer, naming
 
 
 class Adaptor(object):
-    def __init__(self, connection: str, naming: Naming):
+    def __init__(self, connection: str):
         self.connection = connection
-        self.naming = naming
 
     def import_schema(self, db_name: str = None, options: {} = None) -> Database:
         ...
@@ -15,13 +15,13 @@ class Adaptor(object):
         ...
 
     @staticmethod
-    def generate_schema_definition(database: Database, definition_file: str, serializer: HardSerializer):
+    def generate_schema_definition(database: Database, definition_file: str):
         with open(definition_file, 'w') as output_file:
             output_file.write(serializer.serialize(database, True))
             output_file.flush()
 
     @staticmethod
-    def import_definition(definition_file: str, naming: Naming, serializer: HardSerializer) -> Database:
+    def import_definition(definition_file: str) -> Database:
         text = ""
         with open(definition_file, 'r') as input_file:
             lines = input_file.readlines()

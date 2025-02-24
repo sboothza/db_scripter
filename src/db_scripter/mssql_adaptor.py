@@ -4,11 +4,10 @@ from typing import List
 
 import pymssql
 from pymssql import Connection
-from sb_serializer import Name, Naming
 from toposort import toposort_flatten
 
 from adaptor import Adaptor
-from common import create_dir
+from common import create_dir, naming
 from database_objects import Database, Table, KeyType, Field, DataException, DatatypeException, View, \
     UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName, Dependancy, Key, Constraint
 from database_objects import Function
@@ -19,11 +18,9 @@ class MsSqlAdaptor(Adaptor):
     """ Connection string is mssql://user:pass@hostname/database """
     __blank_connection__ = "mssql://u:p@h/d"
     options: Options
-    naming: Naming
 
-    def __init__(self, connection, naming):
-        super().__init__(connection, naming)
-        self.naming = naming
+    def __init__(self, connection):
+        super().__init__(connection)
 
         match = re.match(r"mssql://((\w*):(\w*)@)?([^/]+)/([^?]+)(\?.+)?", self.connection)
         if match:
@@ -39,11 +36,6 @@ class MsSqlAdaptor(Adaptor):
 
         else:
             raise DataException("Invalid connection string")
-
-    # def get_option(self, name: str, default: str) -> str:
-    #     if name not in self.options.keys():
-    #         return default
-    #     return self.options[name]
 
     def connect(self) -> Connection:
         connection = None
@@ -63,7 +55,7 @@ class MsSqlAdaptor(Adaptor):
         if db_name is None:
             db_name = self.database
 
-        database = Database(Name(db_name))
+        database = Database(naming.string_to_name(db_name))
         database.imported_db_type = "mssql"
 
         cursor = connection.cursor(as_dict=True)
@@ -82,8 +74,7 @@ class MsSqlAdaptor(Adaptor):
 
             for row in cursor.fetchall():
                 print(f"{row["schema_name"]}.{row["name"]}")
-                udt = UDDT(name=QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                              self.naming.string_to_name(row["name"])),
+                udt = UDDT(name=QualifiedName.create(row["schema_name"], row["name"]),
                            required=row["is_nullable"] == 0,
                            native_type=row["base_type"])
                 self.get_field_type_defaults(database, row["base_type"], udt, row["max_length"], row["precision"],
@@ -110,12 +101,10 @@ class MsSqlAdaptor(Adaptor):
                 if table_name != new_table_name:
                     print(new_table_name)
                     table_name = new_table_name
-                    table = Table(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                                self.naming.string_to_name(row["table_name"])))
+                    table = Table(QualifiedName.create(row["schema_name"], row["table_name"]))
                     database.tables.append(table)
 
-                field = Field(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                            self.naming.string_to_name(row["name"])),
+                field = Field(QualifiedName.create(row["schema_name"], row["name"]),
                               auto_increment=row["IS_IDENTITY"] == 1,
                               required=row["is_nullable"], native_type=row["data_type"])
                 self.get_field_type_defaults(database, row["data_type"], field, row["max_length"], row["precision"],
@@ -141,19 +130,18 @@ class MsSqlAdaptor(Adaptor):
                 if view_name != new_view_name:
                     print(new_view_name)
                     view_name = new_view_name
-                    view = View(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                              self.naming.string_to_name(row["view_name"])))
+                    view = View(QualifiedName.create(row["schema_name"], row["view_name"]))
                     view.definition = row["definition"]
                     database.views.append(view)
 
                 if "." in row["name"]:
                     names = (str(row["name"])).split(".")
                     field = Field(
-                        QualifiedName(self.naming.string_to_name(names[0]), self.naming.string_to_name(names[1])),
+                        QualifiedName.create(names[0], names[1]),
                         required=row["is_nullable"], native_type=row["data_type"])
                 else:
                     field = Field(
-                        QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(row["name"])),
+                        QualifiedName.create("", row["name"]),
                         required=row["is_nullable"],
                         native_type=row["data_type"])
 
@@ -186,14 +174,12 @@ class MsSqlAdaptor(Adaptor):
                 if udtt_name != new_udtt_name:
                     print(new_udtt_name)
                 udtt_name = new_udtt_name
-                udtt = UDTT(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                          self.naming.string_to_name(row["Type Name"])))
+                udtt = UDTT(QualifiedName.create(row["schema_name"], row["Type Name"]))
                 database.udtts.append(udtt)
 
-                field = Field(QualifiedName(
-                    self.naming.string_to_name(row["schema_name"]), self.naming.string_to_name(row["Column"])),
-                    required=row["Nullable"] == 0,
-                    native_type=row["Data Type"])
+                field = Field(QualifiedName.create(row["schema_name"], row["Column"]),
+                              required=row["Nullable"] == 0,
+                              native_type=row["Data Type"])
                 # is uddt?
                 t = database.get_type(row["Data Type"])
                 if t is not None:
@@ -222,8 +208,7 @@ class MsSqlAdaptor(Adaptor):
 
             for row in cursor.fetchall():
                 print(f"{row["schema_name"]}.{row["name"]}")
-                f = Function(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                           self.naming.string_to_name(row["name"])), row["definition"],
+                f = Function(QualifiedName.create(row["schema_name"], row["name"]), row["definition"],
                              FunctionType.from_str(row["type"]))
                 database.functions.append(f)
 
@@ -236,8 +221,7 @@ class MsSqlAdaptor(Adaptor):
 
             for row in cursor.fetchall():
                 print(f"{row["schema_name"]}.{row["name"]}")
-                sp = StoredProcedure(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                                   self.naming.string_to_name(row["name"])), row["text"])
+                sp = StoredProcedure(QualifiedName.create(row["schema_name"], row["name"]), row["text"])
                 database.stored_procedures.append(sp)
 
         if options["exclude-foreignkeys"]:
@@ -263,15 +247,18 @@ class MsSqlAdaptor(Adaptor):
                 print(f"{row["schema_name"]}.{row["FK_NAME"]}")
                 new_fk_name = f"{row["schema_name"]}.{row["FK_NAME"]}"
                 if fk_name != new_fk_name:
-                    fk = Key(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                           self.naming.string_to_name(row["FK_NAME"])), KeyType.ForeignKey)
-                    fk.primary_table = QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                                     self.naming.string_to_name(row["table"]))
-                    fk.referenced_table = QualifiedName(self.naming.string_to_name(row["ref_schema_name"]),
-                                                        self.naming.string_to_name(row["referenced_table"]))
-                    table = database.get_table(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                                             self.naming.string_to_name(row["table"])))
+                    fk = Key(QualifiedName.create(row["schema_name"],
+                                                  row["FK_NAME"]), KeyType.ForeignKey)
+                    fk.primary_table = QualifiedName.create(row["schema_name"],
+                                                            row["table"])
+                    fk.referenced_table = QualifiedName.create(row["ref_schema_name"],
+                                                               row["referenced_table"])
+                    table = database.get_table(QualifiedName.create(row["schema_name"],
+                                                                    row["table"]))
                     table.foreign_keys.append(fk)
+
+                    database.dependancies.append(Dependancy(fk.primary_table, fk.referenced_table))
+
                     fk_name = new_fk_name
 
                 fk.primary_fields.append(row["column"])
@@ -291,12 +278,12 @@ class MsSqlAdaptor(Adaptor):
 
             for row in cursor.fetchall():
                 print(f"{row["schema_name"]}.{row["constraint_name"]}")
-                table = database.get_table(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                                         self.naming.string_to_name(row["table_name"])))
-                con = Constraint(QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                               self.naming.string_to_name(row["constraint_name"])),
-                                 QualifiedName(self.naming.string_to_name(row["schema_name"]),
-                                               self.naming.string_to_name(row["table_name"])), row["definition"])
+                table = database.get_table(QualifiedName.create(row["schema_name"],
+                                                                row["table_name"]))
+                con = Constraint(QualifiedName.create(row["schema_name"],
+                                                      row["constraint_name"]),
+                                 QualifiedName.create(row["schema_name"],
+                                                      row["table_name"]), row["definition"])
                 table.constraints.append(con)
 
         if options["exclude-primarykeys"]:
@@ -317,12 +304,12 @@ class MsSqlAdaptor(Adaptor):
                 print(f"{row["TABLE_SCHEMA"]}.{row["TABLENAME"]}")
                 new_pk_name = f"{row["TABLE_SCHEMA"]}.{row["TABLENAME"]}"
                 if pk_name != new_pk_name:
-                    pk = Key(QualifiedName(self.naming.string_to_name(row["TABLE_SCHEMA"]),
-                                           self.naming.string_to_name(row["CONSTRAINT_NAME"])), KeyType.PrimaryKey)
-                    pk.primary_table = QualifiedName(self.naming.string_to_name(row["TABLE_SCHEMA"]),
-                                                     self.naming.string_to_name(row["TABLENAME"]))
-                    table = database.get_table(QualifiedName(self.naming.string_to_name(row["TABLE_SCHEMA"]),
-                                                             self.naming.string_to_name(row["TABLENAME"])))
+                    pk = Key(QualifiedName.create(row["TABLE_SCHEMA"],
+                                                  row["CONSTRAINT_NAME"]), KeyType.PrimaryKey)
+                    pk.primary_table = QualifiedName.create(row["TABLE_SCHEMA"],
+                                                            row["TABLENAME"])
+                    table = database.get_table(QualifiedName.create(row["TABLE_SCHEMA"],
+                                                                    row["TABLENAME"]))
                     table.pk = pk
                     pk_name = new_pk_name
 
@@ -345,15 +332,15 @@ class MsSqlAdaptor(Adaptor):
                 print(
                     f"{row["entity_schema"]}.{row["entity_name"]} => {row["referenced_schema_name"]}.{row["referenced_entity_name"]}")
 
-                obj = database.get_object(QualifiedName(self.naming.string_to_name(row["entity_schema"]),
-                                                        self.naming.string_to_name(row["entity_name"])),
+                obj = database.get_object(QualifiedName.create(row["entity_schema"],
+                                                               row["entity_name"]),
                                           self.get_object_type(row["entity_type"]))
                 if obj is None:
                     raise DataException("Couldn't find object!")
 
                 ref = database.get_object(
-                    QualifiedName(self.naming.string_to_name(row["referenced_schema_name"]),
-                                  self.naming.string_to_name(row["referenced_entity_name"])),
+                    QualifiedName.create(row["referenced_schema_name"],
+                                         row["referenced_entity_name"]),
                     self.get_object_type(row["referenced_type"]))
                 if ref is None:
                     raise DataException("Couldn't find object!")
@@ -370,20 +357,18 @@ class MsSqlAdaptor(Adaptor):
             for row in cursor.fetchall():
                 print(
                     f"{row["SPECIFIC_SCHEMA"]}.{row["SPECIFIC_NAME"]} => {row["USER_DEFINED_TYPE_SCHEMA"]}.{row["USER_DEFINED_TYPE_NAME"]}")
-                obj = database.get_object(QualifiedName(self.naming.string_to_name(row["SPECIFIC_SCHEMA"]),
-                                                        self.naming.string_to_name(row["SPECIFIC_NAME"])),
+                obj = database.get_object(QualifiedName.create(row["SPECIFIC_SCHEMA"], row["SPECIFIC_NAME"]),
                                           "StoredProcedure")
                 if obj is None:
                     raise DataException("Couldn't find object!")
                 ref_type = "UDTT"
                 ref = database.get_object(
-                    QualifiedName(self.naming.string_to_name(row["USER_DEFINED_TYPE_SCHEMA"]),
-                                  self.naming.string_to_name(row["USER_DEFINED_TYPE_NAME"])),
+                    QualifiedName.create(row["USER_DEFINED_TYPE_SCHEMA"], row["USER_DEFINED_TYPE_NAME"]),
                     self.get_object_type("UDTT"))
                 if ref is None:
                     ref = database.get_object(
-                        QualifiedName(self.naming.string_to_name(row["USER_DEFINED_TYPE_SCHEMA"]),
-                                      self.naming.string_to_name(row["USER_DEFINED_TYPE_NAME"])),
+                        QualifiedName.create(row["USER_DEFINED_TYPE_SCHEMA"],
+                                      row["USER_DEFINED_TYPE_NAME"]),
                         self.get_object_type("UDDT"))
                     ref_type = "UDDT"
                     if ref is None:
@@ -395,12 +380,12 @@ class MsSqlAdaptor(Adaptor):
         connection.close()
         return database
 
-    def calculate_sp_dependencies(self, database: Database) -> List[StoredProcedure]:
-        dependencies = {d.obj: [] for d in database.dependencies}
-        for item in database.dependencies:
-            dependencies[item.obj].append(item.referenced_obj)
+    def calculate_sp_dependancies(self, database: Database) -> List[StoredProcedure]:
+        dependancies = {d.obj: [] for d in database.dependancies}
+        for item in database.dependancies:
+            dependancies[item.obj].append(item.referenced_obj)
 
-        graph = dict(zip(dependencies.keys(), map(set, dependencies.values())))
+        graph = dict(zip(dependancies.keys(), map(set, dependancies.values())))
         sorted_graph = toposort_flatten(graph, sort=True)
 
         remaining_list = [item.name for item in database.stored_procedures if item.name not in sorted_graph]
@@ -430,7 +415,7 @@ class MsSqlAdaptor(Adaptor):
         create_dir(local_path, delete=True)
 
         # calculating dependencies
-        stored_procs = self.calculate_sp_dependencies(database)
+        stored_procs = self.calculate_sp_dependancies(database)
         reversed_sp = stored_procs[:]
         reversed_sp.reverse()
 
@@ -519,7 +504,7 @@ class MsSqlAdaptor(Adaptor):
             return f"'{field.default}'"
         return field.default
 
-    def generate_create_script(self, table: Table, original_db_type:str) -> str:
+    def generate_create_script(self, table: Table, original_db_type: str) -> str:
         sql: list[str] = []
         for field in table.fields:
             field_sql = (f"[{field.name}] {self.get_field_type(field, original_db_type)}"
@@ -552,13 +537,13 @@ class MsSqlAdaptor(Adaptor):
         sql = sp.text
         return sql
 
-    def generate_create_uddt_script(self, udt: UDDT, original_db_type:str) -> str:
+    def generate_create_uddt_script(self, udt: UDDT, original_db_type: str) -> str:
         sql = f"CREATE TYPE {udt.name.schema}.{udt.name.name} FROM "
         f"[{udt.generic_type}] {self.get_field_type(udt, original_db_type)}"
         f"{self.get_field_size(udt)} {'NOT NULL' if udt.required else 'NULL'}"
         return sql
 
-    def generate_create_udtt_script(self, udt: UDTT, original_db_type:str) -> str:
+    def generate_create_udtt_script(self, udt: UDTT, original_db_type: str) -> str:
         sql = f"CREATE TYPE [{udt.name.schema}].[{udt.name.name}] AS TABLE ("
 
         field_sql = [f"[{field.name.name}] {self.get_field_type(field, original_db_type)} "
@@ -632,7 +617,7 @@ class MsSqlAdaptor(Adaptor):
 
         field.default = default
 
-    def get_field_type(self, field: Field | UDDT, original_db_type:str) -> str:
+    def get_field_type(self, field: Field | UDDT, original_db_type: str) -> str:
         if original_db_type == "mssql" and field.native_type is not None:
             return field.native_type.name.raw()
 

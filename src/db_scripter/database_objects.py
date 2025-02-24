@@ -3,12 +3,18 @@ from typing import List
 
 from sb_serializer import Name
 
+from src.db_scripter.common import naming
+
 
 class DataException(Exception):
     ...
 
 
 class DatatypeException(DataException):
+    ...
+
+
+class QualifiedName:
     ...
 
 
@@ -22,6 +28,10 @@ class QualifiedName:
     def __init__(self, schema: Name = None, name: Name = None):
         self.schema = schema
         self.name = name
+
+    @staticmethod
+    def create(schema: str, name: str) -> QualifiedName:
+        return QualifiedName(naming.string_to_name(schema), naming.string_to_name(name))
 
     def __str__(self):
         return f"{self.schema.pascal()}.{self.name.pascal()}"
@@ -286,11 +296,11 @@ class Dependancy:
         return str(self.obj)
 
     def __eq__(self, other):
-        return (self.name == other.name and self.obj == other.obj and self.referenced_obj == other.referenced_obj
+        return (self.obj == other.obj and self.referenced_obj == other.referenced_obj
                 and self.obj_type == other.obj_type)
 
     def __hash__(self):
-        return hash((self.name, self.obj, self.referenced_obj, self.obj_type))
+        return hash((self.obj, self.referenced_obj, self.obj_type))
 
 
 class Constraint(SchemaObject):
@@ -531,23 +541,10 @@ class Database(object):
         self.tables = self.tables[:count]
         self.stored_procedures = self.stored_procedures[:count]
         self.udtts = self.udtts[:count]
-        self.dependencies = [d for d in self.dependencies if
+        self.dependancies = [d for d in self.dependancies if
                              self.get_table(d.obj) is None or self.get_table(d.referenced_obj) is None]
 
         self.dependancies = self.dependancies[:count]
-
-    def get_diff(self, target_database: Database):
-        diff_db: Database = Database(target_database.name)
-
-        # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
-        diff_db.tables = self.diff_entity(self.tables, target_database.tables)
-        diff_db.views = self.diff_entity(self.views, target_database.views)
-        diff_db.stored_procedures = self.diff_entity(self.stored_procedures, target_database.stored_procedures)
-        diff_db.functions = self.diff_entity(self.functions, target_database.functions)
-        diff_db.udtts = self.diff_entity(self.udtts, target_database.udtts)
-        diff_db.uddts = self.diff_entity(self.uddts, target_database.uddts)
-        diff_db.dependancies = self.dependancies.extend(target_database.dependancies)
-        diff_db.finalise()
 
     def clean_dependancies(self):
         new_dependencies: list[Dependancy] = []
@@ -599,6 +596,19 @@ class Database(object):
         self.dependancies.sort(key=lambda x: str(x.obj.name).lower())
         self.uddts.sort(key=lambda x: str(x.name).lower())
         self.clean_dependancies()
+
+    def get_diff(self, target_database: Database):
+        diff_db: Database = Database(target_database.name)
+
+        # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
+        diff_db.tables = self.diff_entity(self.tables, target_database.tables)
+        diff_db.views = self.diff_entity(self.views, target_database.views)
+        diff_db.stored_procedures = self.diff_entity(self.stored_procedures, target_database.stored_procedures)
+        diff_db.functions = self.diff_entity(self.functions, target_database.functions)
+        diff_db.udtts = self.diff_entity(self.udtts, target_database.udtts)
+        diff_db.uddts = self.diff_entity(self.uddts, target_database.uddts)
+        diff_db.dependancies = self.dependancies.extend(target_database.dependancies)
+        diff_db.finalise()
 
 
 class Term(object):

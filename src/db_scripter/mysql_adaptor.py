@@ -5,6 +5,7 @@ import mysql.connector
 
 from database_objects import Database, Table, KeyType, Key, Field, DataException, DatatypeException, UDDT
 from adaptor import Adaptor
+from src.db_scripter.common import naming
 from src.db_scripter.database_objects import QualifiedName
 
 
@@ -12,8 +13,8 @@ class MySqlAdaptor(Adaptor):
     """ Connection string is mysql://user:pass@hostname/database """
     __blank_connection__ = "mysql://u:p@h/d"
 
-    def __init__(self, connection, naming):
-        super().__init__(connection, naming)
+    def __init__(self, connection):
+        super().__init__(connection)
 
         match = re.match(r"mysql:\/\/(\w+):(\w+)@(\w+)\/(\w+)", self.connection)
         if match:
@@ -31,13 +32,13 @@ class MySqlAdaptor(Adaptor):
         if db_name is None:
             db_name = self.database
 
-        database = Database(self.naming.string_to_name(db_name))
+        database = Database(naming.string_to_name(db_name))
         cursor = connection.cursor(buffered=True)
         print("Processing tables...")
         cursor.execute("select TABLE_NAME from INFORMATION_SCHEMA.tables where TABLE_SCHEMA = 'test' and "
                        "TABLE_TYPE = 'BASE TABLE'")
         for row in cursor.fetchall():
-            table = Table(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(row[0])))
+            table = Table(QualifiedName(naming.string_to_name(""), naming.string_to_name(row[0])))
             database.tables.append(table)
 
         for table in database.tables:
@@ -47,7 +48,7 @@ class MySqlAdaptor(Adaptor):
                            f"TABLE_SCHEMA = '{db_name}' and TABLE_NAME='{table.name}' order by ORDINAL_POSITION")
 
             for row in cursor.fetchall():
-                field = Field(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(str(row[0]))),
+                field = Field(QualifiedName(naming.string_to_name(""), naming.string_to_name(str(row[0]))),
                               auto_increment=True if "auto_increment" in str(row[3]).lower() else False,
                               required=str(row[4]).lower() != "yes")
                 self.get_field_type_defaults(row[1].decode("utf-8"), field, row[2] if row[2] is not None else 0, row[5],
@@ -79,7 +80,7 @@ class MySqlAdaptor(Adaptor):
                            f"where s.TABLE_SCHEMA = '{db_name}' and s.TABLE_NAME = '{table.name}' "
                            "group by s.INDEX_NAME, s.NON_UNIQUE, c.CONSTRAINT_TYPE ")
             for row in cursor.fetchall():
-                key = Key(QualifiedName(self.naming.string_to_name(""), self.naming.string_to_name(row[0])))
+                key = Key(QualifiedName(naming.string_to_name(""), naming.string_to_name(row[0])))
                 key.referenced_table = table.name
                 key_type = str(row[5].lower())
                 key.key_type = KeyType.get_keytype(key_type)
