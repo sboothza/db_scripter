@@ -138,5 +138,23 @@ class Parser(object):
             else:
                 new_tokens.extend(group)
 
+        # check for normal tokens
+        # for i in range(len(new_tokens)):
+        #     token = new_tokens[i]
+        #     if token is SqlLiteralToken:
+        #         str_upper = token.value.upper().strip()
+        #         if str_upper == "SELECT":
+        #             new_tokens[i] = SqlSelectToken(token.value)
+        #         elif str_upper == "WHERE":
+        #             new_tokens[i] = SqlWhereToken(token.value)
+        #         elif str_upper == "FROM":
+        #             new_tokens[i] = SqlFromToken(token.value)
+        #         elif str_upper == "NOT":
+        #             new_tokens[i] = SqlNotToken(token.value)
+        #         elif str_upper == "AND":
+        #             new_tokens[i] = SqlBooleanOperatorToken(token.value)
+        #         elif str_upper == "OR":
+        #             new_tokens[i] = SqlBooleanOperatorToken(token.value)
+
         self.tokens = new_tokens
 

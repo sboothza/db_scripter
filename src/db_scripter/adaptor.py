@@ -2,6 +2,7 @@ from typing import List
 from sb_serializer import Naming, HardSerializer
 from database_objects import Table, Database, KeyType, Field, UDDT
 from src.db_scripter.common import serializer, naming
+from src.db_scripter.query_parser import SqlToken
 
 
 class Adaptor(object):
@@ -57,11 +58,14 @@ class Adaptor(object):
 
         return tables
 
-    def generate_create_script(self, table: Table, original_db_type:str) -> str:
+    def generate_create_script(self, table: Table, original_db_type: str) -> str:
         ...
 
-    def get_field_type(self, field: Field | UDDT, original_db_type:str) -> str:
+    def get_field_type(self, field: Field | UDDT, original_db_type: str) -> str:
         ...
 
     def escape_field_list(self, values: List[str]) -> List[str]:
+        ...
+
+    def write_token(self, token: SqlToken) -> str:
         ...

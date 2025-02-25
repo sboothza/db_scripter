@@ -12,6 +12,8 @@ from database_objects import Database, Table, KeyType, Field, DataException, Dat
     UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName, Dependancy, Key, Constraint
 from database_objects import Function
 from options import Options
+from src.db_scripter.query_parser import SqlToken, SqlStarToken, SqlSelectToken, SqlFromToken, SqlWhereToken, \
+    SqlLiteralToken, SqlNotToken, SqlOperatorToken, SqlBooleanOperatorToken
 
 
 class MsSqlAdaptor(Adaptor):
@@ -657,3 +659,23 @@ class MsSqlAdaptor(Adaptor):
 
     def escape_field_list(self, values: List[str]) -> List[str]:
         return [f"`{value}`" for value in values]
+
+    def write_token(self, token: SqlToken) -> str:
+        if token is SqlStarToken:
+            return "*"
+        elif token is SqlSelectToken:
+            return "SELECT"
+        elif token is SqlFromToken:
+            return "FROM"
+        elif token is SqlWhereToken:
+            return "WHERE"
+        elif token is SqlLiteralToken:
+            ...
+        elif token is SqlNotToken:
+            return "NOT"
+        elif token is SqlOperatorToken:
+            return token.value
+        elif token is SqlBooleanOperatorToken:
+            return token.value
+        else:
+            raise DataException("Unknown token!")
