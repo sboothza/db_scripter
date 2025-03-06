@@ -1,7 +1,7 @@
 import itertools
 from enum import Enum
 
-from src.db_scripter.common import is_str_char
+from common import is_str_char
 
 
 class SqlToken(object):

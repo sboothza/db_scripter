@@ -3,10 +3,9 @@ import re
 import sqlite3
 from typing import Union, List
 
-from database_objects import Database, Table, KeyType, Key, Field, DatatypeException, DataException, UDDT, View
+from database_objects import Database, Table, KeyType, Key, Field, DatatypeException, DataException, UDDT, View, QualifiedName
 from adaptor import Adaptor
 from common import get_fullname, get_filename, clean_string, find_in_list, create_dir, naming
-from src.db_scripter.database_objects import QualifiedName
 
 
 class SqliteAdaptor(Adaptor):

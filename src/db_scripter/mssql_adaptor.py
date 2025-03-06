@@ -9,10 +9,9 @@ from toposort import toposort_flatten
 from adaptor import Adaptor
 from common import create_dir, naming
 from database_objects import Database, Table, KeyType, Field, DataException, DatatypeException, View, \
-    UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName, Dependancy, Key, Constraint
-from database_objects import Function
+    UDDT, UDTT, StoredProcedure, FunctionType, QualifiedName, Dependancy, Key, Constraint, Function
 from options import Options
-from src.db_scripter.query_parser import SqlToken, SqlStarToken, SqlSelectToken, SqlFromToken, SqlWhereToken, \
+from query_parser import SqlToken, SqlStarToken, SqlSelectToken, SqlFromToken, SqlWhereToken, \
     SqlLiteralToken, SqlNotToken, SqlOperatorToken, SqlBooleanOperatorToken
 
 

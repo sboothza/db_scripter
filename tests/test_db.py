@@ -10,7 +10,6 @@ class TestDb(unittest.TestCase):
         ...
 
     def test_dependancies(self):
-        # naming = Naming("..\\dictionary.txt", "..\\bigworddictionary.txt")
         db = Database(naming.string_to_name("test"))
         table_cust = Table(QualifiedName.create("", "customer"))
         db.tables.append(table_cust)

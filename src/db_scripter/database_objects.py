@@ -3,7 +3,7 @@ from typing import List
 
 from sb_serializer import Name
 
-from src.db_scripter.common import naming
+from common import naming
 
 
 class DataException(Exception):

@@ -1,24 +1,16 @@
 import argparse
 
-import orjson
 from sb_serializer import Naming, HardSerializer
 
 from adaptor_factory import AdaptorFactory
 from database_objects import Database
-from src.db_scripter.common import naming, serializer
-from src.db_scripter.options import Options
+from common import naming, serializer
+from options import Options
+from src.db_scripter.config import EXCLUDE
 
 
 def main():
     parser = argparse.ArgumentParser(description="DB Scripter")
-    # parser.add_argument('--dictionary-file',
-    #                     help='Path to dictionary file',
-    #                     dest='dictionary_file',
-    #                     required=True)
-    # parser.add_argument('--big-dictionary-file',
-    #                     help='Path to big dictionary file',
-    #                     dest='big_dictionary_file',
-    #                     required=True)
     parser.add_argument('--connection-string',
                         help='DB Connection String',
                         dest='connection_string')
@@ -33,37 +25,28 @@ def main():
                         type=str.lower,
                         required=True,
                         choices=['import-schema', 'export-schema'])
-    parser.add_argument('--exclude',
-                        help='Db object types to exclude (tables,views,functions,udts,storedprocedures,foreignkeys,constraints,primarykeys,dependencies',
-                        type=str.lower,
-                        default='')
 
     args = parser.parse_args()
-
-    # naming = Naming(args.dictionary_file, args.big_dictionary_file)
-    # serializer = HardSerializer(naming=naming)
-
     adaptor = AdaptorFactory.get_adaptor_for_connection_string(args.connection_string)
-    # adaptor = AdaptorFactory.get_adaptor_for_connection_string("mssql://DV4-POLSQLAG-01/Polly_C?integrated_authentication=True", naming)
 
     options = Options()
-    if "tables" in args.exclude:
+    if "tables" in EXCLUDE:
         options["exclude-tables"] = "True"
-    if "views" in args.exclude:
+    if "views" in EXCLUDE:
         options["exclude-views"] = "True"
-    if "functions" in args.exclude:
+    if "functions" in EXCLUDE:
         options["exclude-functions"] = "True"
-    if "udts" in args.exclude:
+    if "udts" in EXCLUDE:
         options["exclude-udts"] = "True"
-    if "storedprocedures" in args.exclude:
+    if "storedprocedures" in EXCLUDE:
         options["exclude-storedprocedures"] = "True"
-    if "foreignkeys" in args.exclude:
+    if "foreignkeys" in EXCLUDE:
         options["exclude-foreignkeys"] = "True"
-    if "constraints" in args.exclude:
+    if "constraints" in EXCLUDE:
         options["exclude-constraints"] = "True"
-    if "primarykeys" in args.exclude:
+    if "primarykeys" in EXCLUDE:
         options["exclude-primarykeys"] = "True"
-    if "dependencies" in args.exclude:
+    if "dependencies" in EXCLUDE:
         options["exclude-dependencies"] = "True"
 
     if args.operation == "import-schema":

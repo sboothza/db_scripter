@@ -1,8 +1,8 @@
 from typing import List
 from sb_serializer import Naming, HardSerializer
 from database_objects import Table, Database, KeyType, Field, UDDT
-from src.db_scripter.common import serializer, naming
-from src.db_scripter.query_parser import SqlToken
+from common import serializer, naming
+from query_parser import SqlToken
 
 
 class Adaptor(object):

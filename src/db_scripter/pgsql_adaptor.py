@@ -5,8 +5,8 @@ import psycopg2
 
 from database_objects import Database, Table, KeyType, Key, Field, DataException, DatatypeException, UDDT
 from adaptor import Adaptor
-from src.db_scripter.common import naming
-from src.db_scripter.database_objects import QualifiedName
+from common import naming
+from database_objects import QualifiedName
 
 
 class PgSqlAdaptor(Adaptor):
