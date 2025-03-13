@@ -1,10 +1,8 @@
 import unittest
 
-from sb_serializer import Naming, HardSerializer
-
 from src.db_scripter.database_objects import View
 from src.db_scripter.options import Options
-from src.db_scripter.query_parser import Parser, SqlSelectToken, SqlStarToken, SqlFromToken, SqlLiteralToken, SqlNameToken
+from src.db_scripter.query_parser import Parser, SqlSelectToken, SqlStarToken, SqlFromToken, SqlNameToken
 from tests.common import naming, serializer
 
 

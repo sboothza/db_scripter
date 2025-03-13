@@ -1,8 +1,4 @@
 import re
-
-from pymssql.exceptions import DataError
-from sb_serializer import Naming
-
 from adaptor import Adaptor
 from mssql_adaptor import MsSqlAdaptor
 from mysql_adaptor import MySqlAdaptor

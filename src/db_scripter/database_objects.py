@@ -4,6 +4,7 @@ from typing import List
 from sb_serializer import Name
 
 from common import naming
+from src.db_scripter.common import get_diff_list
 
 
 class DataException(Exception):
@@ -57,6 +58,10 @@ class OperationType(Enum):
 
 
 class SchemaObject:
+    ...
+
+
+class SchemaObject:
     """
     Base class for schema entities - tables, views, sp, everything
     Stores a name (schema + name)
@@ -84,10 +89,12 @@ class SchemaObject:
         """
         ...
 
+    def set_operation(self, operation: OperationType) -> SchemaObject:
+        self.operation = operation
+        return self
 
-# class FieldType(SchemaObject):
-#     def __init__(self, name: QualifiedName = None):
-#         super().__init__(name)
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
 
 
 class UDDT(SchemaObject):
@@ -119,6 +126,9 @@ class UDDT(SchemaObject):
 
     def __hash__(self):
         return hash((self.name, self.generic_type, self.size, self.scale, self.required, self.native_type))
+
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
 
 
 class Field(SchemaObject):
@@ -167,6 +177,9 @@ class Field(SchemaObject):
     def __hash__(self):
         return hash((self.name, self.generic_type, self.size, self.scale, self.auto_increment, self.default,
                      self.required, self.native_type))
+
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
 
 
 class KeyType:
@@ -250,6 +263,9 @@ class Key(SchemaObject):
     def finalise(self):
         self.fields.sort()
 
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
+
 
 class AscendingOrDescendingType:
     ...
@@ -321,6 +337,9 @@ class Constraint(SchemaObject):
     def __hash__(self):
         return hash((self.name, self.table_name, self.definition))
 
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
+
 
 class Table(SchemaObject):
     fields: list[Field]
@@ -361,6 +380,18 @@ class Table(SchemaObject):
         self.foreign_keys.sort()
         self.constraints.sort()
 
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        new_table: Table = new_obj
+
+        diff_table = Table(new_table.name)
+        diff_table.fields = get_diff_list(self.fields, new_table.fields)
+        diff_table.keys = get_diff_list(self.keys, new_table.keys)
+        diff_table.constraints = get_diff_list(self.constraints, new_table.constraints)
+        diff_table.foreign_keys = get_diff_list(self.foreign_keys, new_table.foreign_keys)
+        diff_table.pk = new_table.pk.set_operation(OperationType.Modify)
+
+        return diff_table
+
 
 class View(Table):
     definition: str
@@ -370,6 +401,9 @@ class View(Table):
 
     def __hash__(self):
         return hash((self.name, self.definition))
+
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
 
 
 class StoredProcedure(SchemaObject):
@@ -384,6 +418,9 @@ class StoredProcedure(SchemaObject):
 
     def __hash__(self):
         return hash((self.name, self.text))
+
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
 
 
 class UDTT(SchemaObject):
@@ -412,6 +449,9 @@ class UDTT(SchemaObject):
 
     def finalise(self):
         self.fields.sort()
+
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
 
 
 class FunctionType:
@@ -447,6 +487,9 @@ class Function(SchemaObject):
 
     def __hash__(self):
         return hash((self.name, self.text, self.type))
+
+    def get_diff(self, new_obj: SchemaObject) -> SchemaObject:
+        return new_obj.set_operation(OperationType.Modify)
 
 
 class Database:
@@ -557,29 +600,30 @@ class Database(object):
 
         self.dependancies = new_dependencies
 
-    def diff_entity(self, current: list[SchemaObject], new: list[SchemaObject]) -> list[SchemaObject]:
-        # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
-
-        diff_objs: list[SchemaObject] = []
-
-        objects = [obj for obj in new if obj not in current]
-        for obj in objects:
-            obj.operation = OperationType.Create
-        diff_objs.extend(objects)
-
-        objects = [obj for obj in current if obj not in new]
-        for obj in objects:
-            obj.operation = OperationType.Drop
-        diff_objs.extend(objects)
-
-        # check for changes
-        for obj in current:
-            new_obj = self.find_entity(new, obj.name)
-            if obj is not None and obj != new_obj:
-                new_obj.operation = OperationType.Modify
-                diff_objs.append(new_obj)
-
-        return diff_objs
+    # def diff_entity(self, current: list[SchemaObject], new: list[SchemaObject]) -> list[SchemaObject]:
+    #     # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
+    #
+    #     diff_objs: list[SchemaObject] = []
+    #
+    #     objects = [obj for obj in new if obj not in current]
+    #     for obj in objects:
+    #         obj.operation = OperationType.Create
+    #     diff_objs.extend(objects)
+    #
+    #     objects = [obj for obj in current if obj not in new]
+    #     for obj in objects:
+    #         obj.operation = OperationType.Drop
+    #     diff_objs.extend(objects)
+    #
+    #     # check for changes
+    #     for obj in current:
+    #         new_obj = self.find_entity(new, obj.name)
+    #         if obj is not None and obj != new_obj:
+    #             diff_obj = obj.get_diff(new_obj)
+    #             diff_obj.operation = OperationType.Modify
+    #             diff_objs.append(diff_obj)
+    #
+    #     return diff_objs
 
     def find_entity(self, objs: list[SchemaObject], name: QualifiedName) -> SchemaObject:
         result = [obj for obj in objs if obj.name == name]
@@ -597,18 +641,19 @@ class Database(object):
         self.uddts.sort(key=lambda x: str(x.name).lower())
         self.clean_dependancies()
 
-    def get_diff(self, target_database: Database):
+    def get_diff(self, target_database: Database) -> Database:
         diff_db: Database = Database(target_database.name)
 
         # process: find new entities and create, existing entities not in new, drop, existing in both but different, modify
-        diff_db.tables = self.diff_entity(self.tables, target_database.tables)
-        diff_db.views = self.diff_entity(self.views, target_database.views)
-        diff_db.stored_procedures = self.diff_entity(self.stored_procedures, target_database.stored_procedures)
-        diff_db.functions = self.diff_entity(self.functions, target_database.functions)
-        diff_db.udtts = self.diff_entity(self.udtts, target_database.udtts)
-        diff_db.uddts = self.diff_entity(self.uddts, target_database.uddts)
+        diff_db.tables = get_diff_list(self.tables, target_database.tables)
+        diff_db.views = get_diff_list(self.views, target_database.views)
+        diff_db.stored_procedures = get_diff_list(self.stored_procedures, target_database.stored_procedures)
+        diff_db.functions = get_diff_list(self.functions, target_database.functions)
+        diff_db.udtts = get_diff_list(self.udtts, target_database.udtts)
+        diff_db.uddts = get_diff_list(self.uddts, target_database.uddts)
         diff_db.dependancies = self.dependancies.extend(target_database.dependancies)
         diff_db.finalise()
+        return diff_db
 
 
 class Term(object):

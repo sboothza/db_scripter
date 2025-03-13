@@ -1,10 +1,8 @@
 import argparse
 
-from sb_serializer import Naming, HardSerializer
-
 from adaptor_factory import AdaptorFactory
+from common import serializer
 from database_objects import Database
-from common import naming, serializer
 from options import Options
 from src.db_scripter.config import EXCLUDE
 
@@ -24,7 +22,7 @@ def main():
                         help='Operation',
                         type=str.lower,
                         required=True,
-                        choices=['import-schema', 'export-schema'])
+                        choices=['import-schema', 'export-schema', 'diff-schema'])
 
     args = parser.parse_args()
     adaptor = AdaptorFactory.get_adaptor_for_connection_string(args.connection_string)
@@ -62,10 +60,19 @@ def main():
         with open(args.schema_file, "r", 1024, encoding="utf8") as f:
             json = f.read()
 
-
         db = serializer.de_serialize(json, Database)
 
         adaptor.write_schema(db, args.schema_location)
+
+    elif args.operation == "diff-schema":
+        with open(args.schema_file, "r", 1024, encoding="utf8") as f:
+            json = f.read()
+
+        db_old: Database = serializer.de_serialize(json, Database)
+        db_new: Database = adaptor.import_schema(options=options)
+        db_diff = db_old.get_diff(db_new)
+
+        adaptor.write_schema(db_diff, args.schema_location)
 
 
 if __name__ == "__main__":

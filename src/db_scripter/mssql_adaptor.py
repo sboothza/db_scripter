@@ -13,6 +13,7 @@ from database_objects import Database, Table, KeyType, Field, DataException, Dat
 from options import Options
 from query_parser import SqlToken, SqlStarToken, SqlSelectToken, SqlFromToken, SqlWhereToken, \
     SqlLiteralToken, SqlNotToken, SqlOperatorToken, SqlBooleanOperatorToken
+from src.db_scripter.database_objects import OperationType
 
 
 class MsSqlAdaptor(Adaptor):
@@ -369,7 +370,7 @@ class MsSqlAdaptor(Adaptor):
                 if ref is None:
                     ref = database.get_object(
                         QualifiedName.create(row["USER_DEFINED_TYPE_SCHEMA"],
-                                      row["USER_DEFINED_TYPE_NAME"]),
+                                             row["USER_DEFINED_TYPE_NAME"]),
                         self.get_object_type("UDDT"))
                     ref_type = "UDDT"
                     if ref is None:
@@ -407,7 +408,13 @@ class MsSqlAdaptor(Adaptor):
         counter = 1
         for table in database.tables:
             with open(os.path.join(local_path, f"{counter:03}-{table.name.name}.sql"), "w", 1024, encoding="utf8") as f:
-                f.write(self.generate_create_script(table, database.imported_db_type))
+                if table.operation == OperationType.Create:
+                    f.write(self.generate_create_script(table, database.imported_db_type))
+                elif table.operation == OperationType.Modify:
+                    f.write(self.generate_modify_table_script(table, database.imported_db_type))
+                elif table.operation == OperationType.Drop:
+                    f.write(self.generate_drop_table_script(table, database.imported_db_type))
+
                 f.flush()
             counter += 1
 
@@ -421,7 +428,8 @@ class MsSqlAdaptor(Adaptor):
         reversed_sp.reverse()
 
         with open(os.path.join(local_path, "drop_sp.sql"), "w", 1024, encoding="utf8") as f:
-            for sp in reversed_sp:
+            for sp in [s for s in reversed_sp if
+                       s.operation == OperationType.Modify or s.operation == OperationType.Drop]:
                 sql = (
                     f"IF EXISTS ( SELECT * FROM sysobjects WHERE id = object_id(N'{sp.name.schema}.{sp.name.name}') and "
                     f"OBJECTPROPERTY(id, N'IsProcedure') = 1 )\nBEGIN\n\tDROP PROCEDURE {sp.name.schema}.{sp.name.name}\nEND\n\n")
@@ -431,7 +439,8 @@ class MsSqlAdaptor(Adaptor):
         local_path = os.path.join(path, "udt")
         create_dir(local_path)
         with open(os.path.join(local_path, "drop_udt.sql"), "w", 1024, encoding="utf8") as f:
-            for udt in database.uddts:
+            for udt in [u for u in database.uddts if
+                        u.operation == OperationType.Modify or u.operation == OperationType.Drop]:
                 sql = (
                     f"IF EXISTS ( SELECT * FROM sysobjects WHERE id = object_id(N'{udt.name.schema}.{udt.name.name}')\n\n"
                     f"BEGIN\n\tDROP TYPE {udt.name.schema}.{udt.name.name}\nEND\n")
@@ -441,7 +450,8 @@ class MsSqlAdaptor(Adaptor):
         local_path = os.path.join(path, "udtt")
         create_dir(local_path)
         with open(os.path.join(local_path, "drop_udtt.sql"), "w", 1024, encoding="utf8") as f:
-            for udtt in database.udtts:
+            for udtt in [u for u in database.udtts if
+                         u.operation == OperationType.Modify or u.operation == OperationType.Drop]:
                 sql = (
                     f"IF EXISTS ( SELECT * FROM sysobjects WHERE id = object_id(N'{udtt.name.schema}.{udtt.name.name}')\n\n"
                     f"BEGIN\n\tDROP TYPE {udtt.name.schema}.{udtt.name.name}\nEND\n")
@@ -450,7 +460,8 @@ class MsSqlAdaptor(Adaptor):
         print("Writing UDT scripts....")
         local_path = os.path.join(path, "udt")
         create_dir(local_path)
-        for udt in database.uddts:
+        for udt in [u for u in database.uddts if
+                    u.operation == OperationType.Modify or u.operation == OperationType.Create]:
             with open(os.path.join(local_path, udt.name.name.raw() + ".sql"), "w", 1024, encoding="utf8") as f:
                 f.write(self.generate_create_uddt_script(udt, database.imported_db_type))
                 f.flush()
@@ -458,7 +469,8 @@ class MsSqlAdaptor(Adaptor):
         print("Writing UDTT scripts....")
         local_path = os.path.join(path, "udtt")
         create_dir(local_path)
-        for udt in database.udtts:
+        for udt in [u for u in database.udtts if
+                    u.operation == OperationType.Modify or u.operation == OperationType.Create]:
             with open(os.path.join(local_path, udt.name.name.raw() + ".sql"), "w", 1024, encoding="utf8") as f:
                 f.write(self.generate_create_udtt_script(udt, database.imported_db_type))
                 f.flush()
@@ -467,7 +479,8 @@ class MsSqlAdaptor(Adaptor):
         local_path = os.path.join(path, "sp")
         create_dir(local_path)
         counter = 1
-        for sp in stored_procs:
+        for sp in [s for s in stored_procs if
+                   s.operation == OperationType.Create or s.operation == OperationType.Modify]:
             with open(os.path.join(local_path, f"{counter:03}-{sp.name.name}.sql"), "w", 1024, encoding="utf8") as f:
                 f.write(self.generate_create_sp_script(sp))
                 f.flush()
@@ -524,6 +537,42 @@ class MsSqlAdaptor(Adaptor):
         result = f"CREATE TABLE [{table.name}] (\n\t{joiner.join(sql)}\n);\n"
 
         for key in table.keys:
+            if key.key_type == KeyType.Unique:
+                result += f"CREATE UNIQUE INDEX [{key.name}] ON {table.name} " \
+                          f"({','.join(self.escape_field_list(key.fields))});\n"
+
+            elif key.key_type == KeyType.Index:
+                result += f"CREATE INDEX [{key.name}] ON {table.name} " \
+                          f"({','.join(self.escape_field_list(key.fields))});\n"
+
+        return result
+
+    def generate_drop_table_script(self, table: Table, original_db_type: str) -> str:
+        return (f"IF EXISTS ( SELECT * FROM sysobjects WHERE id = object_id(N'{table.name}')\n\n"
+                f"BEGIN\n\tDROP TYPE {table.name}\nEND\n")
+
+    def generate_modify_table_script(self, table: Table, original_db_type: str) -> str:
+        sql: list[str] = []
+        for field in [f for f in table.fields if
+                      f.operation == OperationType.Create or f.operation == OperationType.Modify]:
+            field_sql = (f"[{field.name}] {self.get_field_type(field, original_db_type)}"
+                         f"{self.get_field_size(field)} {'NOT NULL' if field.required else 'NULL'}"
+                         f"{' IDENTITY(1, 1)' if field.auto_increment else ''}"
+                         f"{' DEFAULT (' + self.get_field_default(field) + ')' if field.default else ''}")
+            sql.append(field_sql)
+
+        if table.pk and (table.pk.operation == OperationType.Create or table.pk.operation == OperationType.Modify):
+            sql.append(f"PRIMARY KEY ({','.join(table.pk.fields)})")
+
+        for fk in [key for key in table.keys if key.key_type == KeyType.ForeignKey and (
+                key.operation == OperationType.Create or key.operation == OperationType.Modify)]:
+            sql.append(f"FOREIGN KEY ({','.join(self.escape_field_list(fk.fields))}) REFERENCES "
+                       f"{fk.primary_table}({','.join(self.escape_field_list(fk.primary_fields))})")
+        joiner = ',\n\t'
+        result = f"ALTER TABLE [{table.name}] (\n\t{joiner.join(sql)}\n);\n"
+
+        for key in [k for k in table.keys if
+                    (k.operation == OperationType.Create or k.operation == OperationType.Modify)]:
             if key.key_type == KeyType.Unique:
                 result += f"CREATE UNIQUE INDEX [{key.name}] ON {table.name} " \
                           f"({','.join(self.escape_field_list(key.fields))});\n"
@@ -610,7 +659,7 @@ class MsSqlAdaptor(Adaptor):
             field.generic_type = "hierarchy"
             field.size = 1
         else:
-            uddt = database.get_type(value)
+            uddt = database.get_type(QualifiedName.create("", value))
             if uddt is None:
                 raise DatatypeException("Unknown field type {}".format(value))
             else:

@@ -1,7 +1,6 @@
 from typing import List
-from sb_serializer import Naming, HardSerializer
-from database_objects import Table, Database, KeyType, Field, UDDT
 from common import serializer, naming
+from database_objects import Table, Database, KeyType, Field, UDDT
 from query_parser import SqlToken
 
 
